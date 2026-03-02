@@ -7,6 +7,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const info: Record<string, any> = {
     status: 'ok',
+    version: '2',
     timestamp: new Date().toISOString(),
     node: process.version,
   };
