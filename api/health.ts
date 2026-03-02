@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import dns from 'dns';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -7,58 +8,88 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const info: Record<string, any> = {
     status: 'ok',
-    version: '4',
+    version: '5',
     timestamp: new Date().toISOString(),
   };
 
   const projectRef = 'hlplnckcqsmcbauuerrr';
   const password = 'Sine140430134508';
-  
-  // Try to find the correct region
-  const regions = [
-    'ap-southeast-1', 'us-east-1', 'us-east-2', 'us-west-1', 'us-west-2',
-    'ap-southeast-2', 'ap-northeast-1', 'ap-northeast-2', 'ap-south-1',
-    'eu-west-1', 'eu-west-2', 'eu-west-3', 'eu-central-1', 'eu-central-2',
-    'ca-central-1', 'sa-east-1',
-  ];
+  const host = `db.${projectRef}.supabase.co`;
 
+  // 1. DNS resolution check
+  try {
+    const addresses4 = await new Promise<string[]>((resolve, reject) => {
+      dns.resolve4(host, (err, addresses) => err ? reject(err) : resolve(addresses));
+    }).catch(() => []);
+    
+    const addresses6 = await new Promise<string[]>((resolve, reject) => {
+      dns.resolve6(host, (err, addresses) => err ? reject(err) : resolve(addresses));
+    }).catch(() => []);
+
+    info.dns = {
+      host,
+      ipv4: addresses4,
+      ipv6: addresses6,
+      hasIPv4: addresses4.length > 0,
+      hasIPv6: addresses6.length > 0,
+    };
+  } catch (err: any) {
+    info.dnsError = err.message;
+  }
+
+  // 2. Try direct connection (both with and without IPv4/IPv6)
   const { PrismaClient } = require('@prisma/client');
   const results: Record<string, string> = {};
-  
-  // Test each region sequentially (stop on first success)
-  for (const region of regions) {
-    const url = `postgresql://postgres.${projectRef}:${password}@aws-0-${region}.pooler.supabase.com:6543/postgres?pgbouncer=true&connect_timeout=5`;
-    try {
-      const p = new PrismaClient({ datasources: { db: { url } } });
-      const r = await p.$queryRaw`SELECT 1 as test`;
-      results[region] = 'SUCCESS';
-      info.workingRegion = region;
-      info.workingUrl = url.replace(password, '***');
-      await p.$disconnect();
-      break;
-    } catch (err: any) {
-      const msg = err.message || '';
-      if (msg.includes('Tenant or user not found')) {
-        results[region] = 'WRONG_REGION';
-      } else if (msg.includes("Can't reach")) {
-        results[region] = 'UNREACHABLE';
-      } else {
-        results[region] = msg.substring(0, 80);
-      }
-    }
-  }
 
-  // Also try Session mode (port 5432 on pooler)
+  // Direct connection (standard)
   try {
-    const url = `postgresql://postgres.${projectRef}:${password}@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres?connect_timeout=5`;
+    const url = `postgresql://postgres:${password}@${host}:5432/postgres?connect_timeout=10`;
     const p = new PrismaClient({ datasources: { db: { url } } });
     await p.$queryRaw`SELECT 1 as test`;
-    results['session-mode-ap-se-1'] = 'SUCCESS';
+    results['direct'] = 'SUCCESS';
+    info.working = 'direct';
     await p.$disconnect();
   } catch (err: any) {
-    results['session-mode-ap-se-1'] = err.message?.includes('Tenant') ? 'WRONG_REGION' : (err.message?.substring(0, 80) ?? 'error');
+    results['direct'] = err.message?.substring(0, 150) ?? 'error';
   }
 
-  info.regionResults = results;
+  // Try with sslmode
+  try {
+    const url = `postgresql://postgres:${password}@${host}:5432/postgres?sslmode=require&connect_timeout=10`;
+    const p = new PrismaClient({ datasources: { db: { url } } });
+    await p.$queryRaw`SELECT 1 as test`;
+    results['direct-ssl'] = 'SUCCESS';
+    info.working = 'direct-ssl';
+    await p.$disconnect();
+  } catch (err: any) {
+    results['direct-ssl'] = err.message?.substring(0, 150) ?? 'error';
+  }
+
+  // Try IPv4 add-on host (Supabase paid feature)
+  try {
+    const ipv4Host = `${projectRef}.supabase.co`;
+    const url = `postgresql://postgres:${password}@${ipv4Host}:5432/postgres?connect_timeout=10`;
+    const p = new PrismaClient({ datasources: { db: { url } } });
+    await p.$queryRaw`SELECT 1 as test`;
+    results['ipv4-host'] = 'SUCCESS';
+    info.working = 'ipv4-host';
+    await p.$disconnect();
+  } catch (err: any) {
+    results['ipv4-host'] = err.message?.substring(0, 150) ?? 'error';
+  }
+
+  // Try port 6543 on the direct host (old pooler)
+  try {
+    const url = `postgresql://postgres:${password}@${host}:6543/postgres?pgbouncer=true&connect_timeout=10`;
+    const p = new PrismaClient({ datasources: { db: { url } } });
+    await p.$queryRaw`SELECT 1 as test`;
+    results['direct-6543'] = 'SUCCESS';
+    info.working = 'direct-6543';
+    await p.$disconnect();
+  } catch (err: any) {
+    results['direct-6543'] = err.message?.substring(0, 150) ?? 'error';
+  }
+
+  info.results = results;
   return res.status(200).json(info);
 }
