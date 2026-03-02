@@ -6,11 +6,16 @@ declare global {
 }
 
 // In serverless environments, limit connections to prevent pool exhaustion
-// Each serverless function instance gets its own PrismaClient
+// Using Supabase connection pooler (pgbouncer) for efficient connection management
+const dbUrl = process.env.DATABASE_URL || '';
+const needsConnectionLimit = !dbUrl.includes('pgbouncer=true');
+const connectionParams = needsConnectionLimit ? 'connection_limit=1&pool_timeout=10' : '';
+const separator = connectionParams ? (dbUrl.includes('?') ? '&' : '?') : '';
+
 const prisma = global.prisma || new PrismaClient({
   datasources: {
     db: {
-      url: process.env.DATABASE_URL + (process.env.DATABASE_URL?.includes('?') ? '&' : '?') + 'connection_limit=1&pool_timeout=10',
+      url: dbUrl + separator + connectionParams,
     },
   },
 });
