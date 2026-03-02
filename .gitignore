@@ -36,3 +36,5 @@ packages/backend/prisma/*.db
 
 # Uploads
 uploads/
+
+.vercel

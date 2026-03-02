@@ -27,7 +27,6 @@ import {
   BgColorsOutlined,
   MailOutlined,
   PhoneOutlined,
-  EnvironmentOutlined,
 } from '@ant-design/icons';
 import { api } from '@/utils/api';
 import { useAuthStore } from '@/store/authStore';
@@ -205,7 +204,7 @@ const SettingsPage: React.FC = () => {
           </Row>
 
           <Form.Item name="address" label={t('settings.address', 'Address')}>
-            <Input.TextArea rows={2} prefix={<EnvironmentOutlined />} />
+            <Input.TextArea rows={2} />
           </Form.Item>
 
           <Row gutter={16}>
