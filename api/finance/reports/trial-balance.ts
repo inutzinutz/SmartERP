@@ -3,6 +3,14 @@ import prisma from '../../_lib/prisma';
 import { getUserFromRequest } from '../../_lib/auth';
 import { cors } from '../../_lib/cors';
 
+// Helper to safely convert Prisma Decimal to number
+const toNum = (val: any): number => {
+  if (val === null || val === undefined) return 0;
+  if (typeof val === 'number') return val;
+  if (typeof val.toNumber === 'function') return val.toNumber();
+  return Number(val) || 0;
+};
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
 
@@ -29,57 +37,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       orderBy: { code: 'asc' },
     });
 
-    // Helper to safely convert Prisma Decimal to number
-    const toNum = (val: any): number => {
-      if (val === null || val === undefined) return 0;
-      if (typeof val === 'number') return val;
-      if (typeof val.toNumber === 'function') return val.toNumber();
-      return Number(val) || 0;
-    };
+    // Get ALL aggregated balances in one raw query
+    const balances: any[] = await prisma.$queryRaw`
+      SELECT 
+        jel."accountId",
+        SUM(jel.debit) as "totalDebit",
+        SUM(jel.credit) as "totalCredit"
+      FROM journal_entry_lines jel
+      JOIN journal_entries je ON jel."journalEntryId" = je.id
+      JOIN accounts a ON jel."accountId" = a.id
+      WHERE a."organizationId" = ${orgId}
+        AND je."isPosted" = true
+        AND je.date <= ${asOfDate}
+      GROUP BY jel."accountId"
+    `;
 
-    // Get aggregated journal entry lines for each account up to the asOfDate
-    const accountBalances = await Promise.all(
-      accounts.map(async (account: any) => {
-        const aggregation = await prisma.journalEntryLine.aggregate({
-          where: {
-            accountId: account.id,
-            journalEntry: {
-              isPosted: true,
-              date: { lte: asOfDate },
-            },
-          },
-          _sum: { debit: true, credit: true },
-        });
+    const balanceMap = new Map<string, { debit: number; credit: number }>();
+    for (const b of balances) {
+      balanceMap.set(b.accountId, {
+        debit: toNum(b.totalDebit),
+        credit: toNum(b.totalCredit),
+      });
+    }
 
-        const totalDebit = toNum(aggregation._sum?.debit);
-        const totalCredit = toNum(aggregation._sum?.credit);
-
-        return {
-          accountId: account.id,
-          accountCode: account.code,
-          accountName: account.name,
-          accountType: account.type,
-          debit: Math.round(totalDebit * 100) / 100,
-          credit: Math.round(totalCredit * 100) / 100,
-          balance: Math.round((totalDebit - totalCredit) * 100) / 100,
-        };
-      })
-    );
+    const accountBalances = accounts.map((account: any) => {
+      const bal = balanceMap.get(account.id) || { debit: 0, credit: 0 };
+      return {
+        accountId: account.id,
+        accountCode: account.code,
+        accountName: account.name,
+        accountType: account.type,
+        debit: Math.round(bal.debit * 100) / 100,
+        credit: Math.round(bal.credit * 100) / 100,
+        balance: Math.round((bal.debit - bal.credit) * 100) / 100,
+      };
+    });
 
     // Filter out zero-balance accounts
     const nonZeroBalances = accountBalances.filter(
-      (a: any) => a.debit !== 0 || a.credit !== 0
+      (a) => a.debit !== 0 || a.credit !== 0
     );
 
     // Calculate totals
-    const totalDebits = nonZeroBalances.reduce((sum: number, a: any) => sum + a.debit, 0);
-    const totalCredits = nonZeroBalances.reduce((sum: number, a: any) => sum + a.credit, 0);
+    const totalDebits = nonZeroBalances.reduce((sum, a) => sum + a.debit, 0);
+    const totalCredits = nonZeroBalances.reduce((sum, a) => sum + a.credit, 0);
 
     // For trial balance display: show debit or credit balance per account
-    const trialBalanceRows = nonZeroBalances.map((a: any) => {
-      const isDebitNormal = ['ASSET', 'EXPENSE'].includes(a.accountType);
+    const trialBalanceRows = nonZeroBalances.map((a) => {
       const netBalance = a.debit - a.credit;
-
       return {
         ...a,
         debitBalance: netBalance > 0 ? Math.round(netBalance * 100) / 100 : 0,
@@ -87,8 +92,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       };
     });
 
-    const totalDebitBalance = trialBalanceRows.reduce((sum: number, r: any) => sum + r.debitBalance, 0);
-    const totalCreditBalance = trialBalanceRows.reduce((sum: number, r: any) => sum + r.creditBalance, 0);
+    const totalDebitBalance = trialBalanceRows.reduce((sum, r) => sum + r.debitBalance, 0);
+    const totalCreditBalance = trialBalanceRows.reduce((sum, r) => sum + r.creditBalance, 0);
 
     return res.status(200).json({
       data: {

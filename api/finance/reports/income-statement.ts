@@ -3,6 +3,14 @@ import prisma from '../../_lib/prisma';
 import { getUserFromRequest } from '../../_lib/auth';
 import { cors } from '../../_lib/cors';
 
+// Helper to safely convert Prisma Decimal to number
+const toNum = (val: any): number => {
+  if (val === null || val === undefined) return 0;
+  if (typeof val === 'number') return val;
+  if (typeof val.toNumber === 'function') return val.toNumber();
+  return Number(val) || 0;
+};
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
 
@@ -29,84 +37,70 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? new Date(req.query.endDate as string)
       : now;
 
-    // Get revenue accounts
-    const revenueAccounts = await prisma.account.findMany({
-      where: { organizationId: orgId, type: 'REVENUE', isActive: true },
+    // Get revenue and expense accounts
+    const accounts = await prisma.account.findMany({
+      where: {
+        organizationId: orgId,
+        type: { in: ['REVENUE', 'EXPENSE'] },
+        isActive: true,
+      },
       orderBy: { code: 'asc' },
     });
 
-    // Get expense accounts
-    const expenseAccounts = await prisma.account.findMany({
-      where: { organizationId: orgId, type: 'EXPENSE', isActive: true },
-      orderBy: { code: 'asc' },
+    // Get aggregated balances in one raw query for the period
+    const balances: any[] = await prisma.$queryRaw`
+      SELECT 
+        jel."accountId",
+        SUM(jel.debit) as "totalDebit",
+        SUM(jel.credit) as "totalCredit"
+      FROM journal_entry_lines jel
+      JOIN journal_entries je ON jel."journalEntryId" = je.id
+      JOIN accounts a ON jel."accountId" = a.id
+      WHERE a."organizationId" = ${orgId}
+        AND a.type IN ('REVENUE', 'EXPENSE')
+        AND je."isPosted" = true
+        AND je.date >= ${startDate}
+        AND je.date <= ${endDate}
+      GROUP BY jel."accountId"
+    `;
+
+    const balanceMap = new Map<string, { debit: number; credit: number }>();
+    for (const b of balances) {
+      balanceMap.set(b.accountId, {
+        debit: toNum(b.totalDebit),
+        credit: toNum(b.totalCredit),
+      });
+    }
+
+    const revenueAccounts = accounts.filter((a: any) => a.type === 'REVENUE');
+    const expenseAccounts = accounts.filter((a: any) => a.type === 'EXPENSE');
+
+    const revenueRows = revenueAccounts.map((account: any) => {
+      const bal = balanceMap.get(account.id) || { debit: 0, credit: 0 };
+      // Revenue is credit-normal
+      const balance = bal.credit - bal.debit;
+      return {
+        accountId: account.id,
+        accountCode: account.code,
+        accountName: account.name,
+        amount: Math.round(balance * 100) / 100,
+      };
     });
 
-    // Helper to safely convert Prisma Decimal to number
-    const toNum = (val: any): number => {
-      if (val === null || val === undefined) return 0;
-      if (typeof val === 'number') return val;
-      if (typeof val.toNumber === 'function') return val.toNumber();
-      return Number(val) || 0;
-    };
+    const expenseRows = expenseAccounts.map((account: any) => {
+      const bal = balanceMap.get(account.id) || { debit: 0, credit: 0 };
+      // Expense is debit-normal
+      const balance = bal.debit - bal.credit;
+      return {
+        accountId: account.id,
+        accountCode: account.code,
+        accountName: account.name,
+        amount: Math.round(balance * 100) / 100,
+      };
+    });
 
-    // Calculate balances for revenue accounts
-    const revenueRows = await Promise.all(
-      revenueAccounts.map(async (account: any) => {
-        const agg = await prisma.journalEntryLine.aggregate({
-          where: {
-            accountId: account.id,
-            journalEntry: {
-              isPosted: true,
-              date: { gte: startDate, lte: endDate },
-            },
-          },
-          _sum: { debit: true, credit: true },
-        });
-
-        const debit = toNum(agg._sum?.debit);
-        const credit = toNum(agg._sum?.credit);
-        // Revenue is credit-normal
-        const balance = credit - debit;
-
-        return {
-          accountId: account.id,
-          accountCode: account.code,
-          accountName: account.name,
-          amount: Math.round(balance * 100) / 100,
-        };
-      })
-    );
-
-    // Calculate balances for expense accounts
-    const expenseRows = await Promise.all(
-      expenseAccounts.map(async (account: any) => {
-        const agg = await prisma.journalEntryLine.aggregate({
-          where: {
-            accountId: account.id,
-            journalEntry: {
-              isPosted: true,
-              date: { gte: startDate, lte: endDate },
-            },
-          },
-          _sum: { debit: true, credit: true },
-        });
-
-        const debit = toNum(agg._sum?.debit);
-        const credit = toNum(agg._sum?.credit);
-        // Expense is debit-normal
-        const balance = debit - credit;
-
-        return {
-          accountId: account.id,
-          accountCode: account.code,
-          accountName: account.name,
-          amount: Math.round(balance * 100) / 100,
-        };
-      })
-    );
-
-    const totalRevenue = revenueRows.reduce((sum: number, r: any) => sum + r.amount, 0);
-    const totalExpenses = expenseRows.reduce((sum: number, r: any) => sum + r.amount, 0);
+    const totalRevenue = revenueRows.reduce((sum, r) => sum + r.amount, 0);
+    const totalExpenses = expenseRows.reduce((sum, r) => sum + r.amount, 0);
     const netIncome = totalRevenue - totalExpenses;
 
     return res.status(200).json({

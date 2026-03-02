@@ -11,46 +11,6 @@ const toNum = (val: any): number => {
   return Number(val) || 0;
 };
 
-async function getAccountBalances(
-  orgId: string,
-  type: string,
-  asOfDate: Date,
-  isDebitNormal: boolean
-) {
-  const accounts = await prisma.account.findMany({
-    where: { organizationId: orgId, type: type as any, isActive: true },
-    orderBy: { code: 'asc' },
-  });
-
-  const rows = await Promise.all(
-    accounts.map(async (account: any) => {
-      const agg = await prisma.journalEntryLine.aggregate({
-        where: {
-          accountId: account.id,
-          journalEntry: {
-            isPosted: true,
-            date: { lte: asOfDate },
-          },
-        },
-        _sum: { debit: true, credit: true },
-      });
-
-      const debit = toNum(agg._sum?.debit);
-      const credit = toNum(agg._sum?.credit);
-      const balance = isDebitNormal ? debit - credit : credit - debit;
-
-      return {
-        accountId: account.id,
-        accountCode: account.code,
-        accountName: account.name,
-        amount: Math.round(balance * 100) / 100,
-      };
-    })
-  );
-
-  return rows;
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
 
@@ -71,24 +31,65 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const asOfDate = req.query.asOfDate ? new Date(req.query.asOfDate as string) : new Date();
 
-    // Get balances for each category
-    const [assetRows, liabilityRows, equityRows] = await Promise.all([
-      getAccountBalances(orgId, 'ASSET', asOfDate, true),
-      getAccountBalances(orgId, 'LIABILITY', asOfDate, false),
-      getAccountBalances(orgId, 'EQUITY', asOfDate, false),
-    ]);
+    // Get ALL active accounts in one query
+    const accounts = await prisma.account.findMany({
+      where: { organizationId: orgId, isActive: true },
+      orderBy: { code: 'asc' },
+    });
 
-    // Calculate retained earnings (Revenue - Expenses for all time up to asOfDate)
-    const revenueRows = await getAccountBalances(orgId, 'REVENUE', asOfDate, false);
-    const expenseRows = await getAccountBalances(orgId, 'EXPENSE', asOfDate, true);
+    // Get ALL aggregated balances in one raw query for efficiency
+    const balances: any[] = await prisma.$queryRaw`
+      SELECT 
+        jel."accountId",
+        SUM(jel.debit) as "totalDebit",
+        SUM(jel.credit) as "totalCredit"
+      FROM journal_entry_lines jel
+      JOIN journal_entries je ON jel."journalEntryId" = je.id
+      JOIN accounts a ON jel."accountId" = a.id
+      WHERE a."organizationId" = ${orgId}
+        AND je."isPosted" = true
+        AND je.date <= ${asOfDate}
+      GROUP BY jel."accountId"
+    `;
 
-    const totalRevenue = revenueRows.reduce((sum: number, r: any) => sum + r.amount, 0);
-    const totalExpenses = expenseRows.reduce((sum: number, r: any) => sum + r.amount, 0);
+    // Build a map of accountId -> { debit, credit }
+    const balanceMap = new Map<string, { debit: number; credit: number }>();
+    for (const b of balances) {
+      balanceMap.set(b.accountId, {
+        debit: toNum(b.totalDebit),
+        credit: toNum(b.totalCredit),
+      });
+    }
+
+    // Categorize accounts
+    const categorize = (type: string, isDebitNormal: boolean) => {
+      const filtered = accounts.filter((a: any) => a.type === type);
+      const rows = filtered.map((a: any) => {
+        const bal = balanceMap.get(a.id) || { debit: 0, credit: 0 };
+        const amount = isDebitNormal ? bal.debit - bal.credit : bal.credit - bal.debit;
+        return {
+          accountId: a.id,
+          accountCode: a.code,
+          accountName: a.name,
+          amount: Math.round(amount * 100) / 100,
+        };
+      });
+      return rows;
+    };
+
+    const assetRows = categorize('ASSET', true);
+    const liabilityRows = categorize('LIABILITY', false);
+    const equityRows = categorize('EQUITY', false);
+    const revenueRows = categorize('REVENUE', false);
+    const expenseRows = categorize('EXPENSE', true);
+
+    const totalRevenue = revenueRows.reduce((sum, r) => sum + r.amount, 0);
+    const totalExpenses = expenseRows.reduce((sum, r) => sum + r.amount, 0);
     const retainedEarnings = Math.round((totalRevenue - totalExpenses) * 100) / 100;
 
-    const totalAssets = assetRows.reduce((sum: number, r: any) => sum + r.amount, 0);
-    const totalLiabilities = liabilityRows.reduce((sum: number, r: any) => sum + r.amount, 0);
-    const totalEquity = equityRows.reduce((sum: number, r: any) => sum + r.amount, 0) + retainedEarnings;
+    const totalAssets = assetRows.reduce((sum, r) => sum + r.amount, 0);
+    const totalLiabilities = liabilityRows.reduce((sum, r) => sum + r.amount, 0);
+    const totalEquity = equityRows.reduce((sum, r) => sum + r.amount, 0) + retainedEarnings;
 
     return res.status(200).json({
       data: {
