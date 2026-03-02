@@ -126,7 +126,7 @@ const ExpensesPage: React.FC = () => {
     if (!isManager) return;
     setApprovalsLoading(true);
     try {
-      const { data } = await api.get('/expenses/pending-approvals');
+      const { data } = await api.get('/expenses?status=PENDING');
       setPendingApprovals(data.data || data);
     } catch {
       // handled
@@ -165,7 +165,7 @@ const ExpensesPage: React.FC = () => {
 
   const handleSubmitClaim = async (id: string) => {
     try {
-      await api.post(`/expenses/${id}/submit`);
+      await api.patch(`/expenses/${id}`, { action: 'submit' });
       message.success(t('expenses.submitSuccess', 'Expense claim submitted'));
       fetchMyExpenses();
     } catch {
@@ -175,7 +175,7 @@ const ExpensesPage: React.FC = () => {
 
   const handleApprove = async (id: string) => {
     try {
-      await api.post(`/expenses/${id}/approve`);
+      await api.patch(`/expenses/${id}`, { action: 'approve' });
       message.success(t('expenses.approveSuccess', 'Expense claim approved'));
       fetchPendingApprovals();
       fetchMyExpenses();
@@ -186,7 +186,7 @@ const ExpensesPage: React.FC = () => {
 
   const handleReject = async (id: string) => {
     try {
-      await api.post(`/expenses/${id}/reject`);
+      await api.patch(`/expenses/${id}`, { action: 'reject' });
       message.success(t('expenses.rejectSuccess', 'Expense claim rejected'));
       fetchPendingApprovals();
       fetchMyExpenses();

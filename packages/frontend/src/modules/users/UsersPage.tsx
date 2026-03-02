@@ -117,7 +117,7 @@ const UsersPage: React.FC = () => {
 
   const handleToggleActive = async (user: User) => {
     try {
-      await api.patch(`/users/${user.id}/status`, { isActive: !user.isActive });
+      await api.put(`/users/${user.id}`, { isActive: !user.isActive });
       message.success(
         user.isActive
           ? t('users.deactivateSuccess', 'User deactivated')

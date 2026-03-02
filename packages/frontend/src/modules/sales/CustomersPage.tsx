@@ -79,7 +79,7 @@ const CustomersPage: React.FC = () => {
   const fetchCustomers = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/customers', {
+      const { data } = await api.get('/sales/customers', {
         params: { page, limit: pageSize, search: search || undefined },
       });
       setCustomers(data.data || data);
@@ -120,7 +120,7 @@ const CustomersPage: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      await api.delete(`/customers/${id}`);
+      await api.delete(`/sales/customers/${id}`);
       message.success(t('customers.deleteSuccess', 'Customer deleted'));
       fetchCustomers();
     } catch {
@@ -132,10 +132,10 @@ const CustomersPage: React.FC = () => {
     setSubmitting(true);
     try {
       if (editingCustomer) {
-        await api.put(`/customers/${editingCustomer.id}`, values);
+        await api.put(`/sales/customers/${editingCustomer.id}`, values);
         message.success(t('customers.updateSuccess', 'Customer updated'));
       } else {
-        await api.post('/customers', values);
+        await api.post('/sales/customers', values);
         message.success(t('customers.createSuccess', 'Customer created'));
       }
       setModalOpen(false);

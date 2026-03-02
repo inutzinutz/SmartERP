@@ -117,7 +117,7 @@ const PurchaseOrdersPage: React.FC = () => {
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/purchase-orders', {
+      const { data } = await api.get('/purchases/orders', {
         params: {
           page,
           limit: pageSize,
@@ -137,7 +137,7 @@ const PurchaseOrdersPage: React.FC = () => {
 
   const fetchSuppliers = async () => {
     try {
-      const { data } = await api.get('/suppliers', { params: { limit: 500 } });
+      const { data } = await api.get('/purchases/suppliers', { params: { limit: 500 } });
       setSuppliers(data.data || data);
     } catch {
       // handled
@@ -177,7 +177,7 @@ const PurchaseOrdersPage: React.FC = () => {
           discount: item.discount || 0,
         })),
       };
-      await api.post('/purchase-orders', payload);
+      await api.post('/purchases/orders', payload);
       message.success(t('purchases.createSuccess', 'Purchase order created'));
       setDrawerOpen(false);
       form.resetFields();
@@ -191,7 +191,7 @@ const PurchaseOrdersPage: React.FC = () => {
 
   const handleAction = async (id: string, action: string) => {
     try {
-      await api.post(`/purchase-orders/${id}/${action}`);
+      await api.patch(`/purchases/orders/${id}`, { action });
       message.success(t(`purchases.${action}Success`, `Order ${action} successful`));
       fetchOrders();
     } catch {
@@ -201,7 +201,7 @@ const PurchaseOrdersPage: React.FC = () => {
 
   const handleViewDetails = async (order: PurchaseOrder) => {
     try {
-      const { data } = await api.get(`/purchase-orders/${order.id}`);
+      const { data } = await api.get(`/purchases/orders/${order.id}`);
       setSelectedOrder(data);
     } catch {
       setSelectedOrder(order);

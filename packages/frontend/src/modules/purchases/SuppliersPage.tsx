@@ -76,7 +76,7 @@ const SuppliersPage: React.FC = () => {
   const fetchSuppliers = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/suppliers', {
+      const { data } = await api.get('/purchases/suppliers', {
         params: { page, limit: pageSize, search: search || undefined },
       });
       setSuppliers(data.data || data);
@@ -118,7 +118,7 @@ const SuppliersPage: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      await api.delete(`/suppliers/${id}`);
+      await api.delete(`/purchases/suppliers/${id}`);
       message.success(t('suppliers.deleteSuccess', 'Supplier deleted'));
       fetchSuppliers();
     } catch {
@@ -130,10 +130,10 @@ const SuppliersPage: React.FC = () => {
     setSubmitting(true);
     try {
       if (editingSupplier) {
-        await api.put(`/suppliers/${editingSupplier.id}`, values);
+        await api.put(`/purchases/suppliers/${editingSupplier.id}`, values);
         message.success(t('suppliers.updateSuccess', 'Supplier updated'));
       } else {
-        await api.post('/suppliers', values);
+        await api.post('/purchases/suppliers', values);
         message.success(t('suppliers.createSuccess', 'Supplier created'));
       }
       setModalOpen(false);

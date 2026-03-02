@@ -117,7 +117,7 @@ const SalesOrdersPage: React.FC = () => {
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/sales-orders', {
+      const { data } = await api.get('/sales/orders', {
         params: {
           page,
           limit: pageSize,
@@ -137,7 +137,7 @@ const SalesOrdersPage: React.FC = () => {
 
   const fetchCustomers = async () => {
     try {
-      const { data } = await api.get('/customers', { params: { limit: 500 } });
+      const { data } = await api.get('/sales/customers', { params: { limit: 500 } });
       setCustomers(data.data || data);
     } catch {
       // handled
@@ -177,7 +177,7 @@ const SalesOrdersPage: React.FC = () => {
           discount: item.discount || 0,
         })),
       };
-      await api.post('/sales-orders', payload);
+      await api.post('/sales/orders', payload);
       message.success(t('sales.createSuccess', 'Sales order created'));
       setDrawerOpen(false);
       form.resetFields();
@@ -191,7 +191,7 @@ const SalesOrdersPage: React.FC = () => {
 
   const handleConfirm = async (id: string) => {
     try {
-      await api.post(`/sales-orders/${id}/confirm`);
+      await api.patch(`/sales/orders/${id}`, { action: 'confirm' });
       message.success(t('sales.confirmSuccess', 'Order confirmed'));
       fetchOrders();
     } catch {
@@ -201,7 +201,7 @@ const SalesOrdersPage: React.FC = () => {
 
   const handleCancel = async (id: string) => {
     try {
-      await api.post(`/sales-orders/${id}/cancel`);
+      await api.patch(`/sales/orders/${id}`, { action: 'cancel' });
       message.success(t('sales.cancelSuccess', 'Order cancelled'));
       fetchOrders();
     } catch {
@@ -211,7 +211,7 @@ const SalesOrdersPage: React.FC = () => {
 
   const handleViewDetails = async (order: SalesOrder) => {
     try {
-      const { data } = await api.get(`/sales-orders/${order.id}`);
+      const { data } = await api.get(`/sales/orders/${order.id}`);
       setSelectedOrder(data);
       setDetailModalOpen(true);
     } catch {

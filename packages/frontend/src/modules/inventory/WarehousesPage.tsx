@@ -66,7 +66,7 @@ const WarehousesPage: React.FC = () => {
   const fetchWarehouses = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/warehouses');
+      const { data } = await api.get('/inventory/warehouses');
       setWarehouses(data.data || data);
     } catch {
       // handled
@@ -103,7 +103,7 @@ const WarehousesPage: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      await api.delete(`/warehouses/${id}`);
+      await api.delete(`/inventory/warehouses/${id}`);
       message.success(t('warehouses.deleteSuccess', 'Warehouse deleted'));
       fetchWarehouses();
     } catch {
@@ -115,10 +115,10 @@ const WarehousesPage: React.FC = () => {
     setSubmitting(true);
     try {
       if (editingWarehouse) {
-        await api.put(`/warehouses/${editingWarehouse.id}`, values);
+        await api.put(`/inventory/warehouses/${editingWarehouse.id}`, values);
         message.success(t('warehouses.updateSuccess', 'Warehouse updated'));
       } else {
-        await api.post('/warehouses', values);
+        await api.post('/inventory/warehouses', values);
         message.success(t('warehouses.createSuccess', 'Warehouse created'));
       }
       setModalOpen(false);

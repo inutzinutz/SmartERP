@@ -176,7 +176,7 @@ const JournalEntriesPage: React.FC = () => {
 
   const handlePost = async (id: string) => {
     try {
-      await api.post(`/finance/journal-entries/${id}/post`);
+      await api.patch(`/finance/journal-entries/${id}`, { action: 'post' });
       message.success(t('journal.postSuccess', 'Journal entry posted'));
       fetchEntries();
     } catch {
@@ -186,7 +186,7 @@ const JournalEntriesPage: React.FC = () => {
 
   const handleVoid = async (id: string) => {
     try {
-      await api.post(`/finance/journal-entries/${id}/void`);
+      await api.patch(`/finance/journal-entries/${id}`, { action: 'void' });
       message.success(t('journal.voidSuccess', 'Journal entry voided'));
       fetchEntries();
     } catch {

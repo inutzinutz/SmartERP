@@ -93,7 +93,7 @@ const InventoryPage: React.FC = () => {
 
   const fetchWarehouses = async () => {
     try {
-      const { data } = await api.get('/warehouses');
+      const { data } = await api.get('/inventory/warehouses');
       setWarehouses(data.data || data);
     } catch {
       // handled
