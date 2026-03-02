@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../lib/prisma';
-import { getUserFromRequest } from '../../lib/auth';
-import { cors } from '../../lib/cors';
+import prisma from '../../_lib/prisma';
+import { getUserFromRequest } from '../../_lib/auth';
+import { cors } from '../../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -61,7 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const { title, description, items } = req.body;
 
-        const claim = await prisma.$transaction(async (tx) => {
+        const claim = await prisma.$transaction(async (tx: any) => {
           if (items && Array.isArray(items)) {
             await tx.expenseItem.deleteMany({ where: { expenseClaimId: id } });
 
@@ -79,7 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             await tx.expenseItem.createMany({ data: expenseItems });
 
-            const totalAmount = expenseItems.reduce((sum, item) => sum + item.amount, 0);
+            const totalAmount = expenseItems.reduce((sum: number, item: any) => sum + item.amount, 0);
 
             return tx.expenseClaim.update({
               where: { id },
@@ -127,7 +127,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ message: 'Only draft or rejected claims can be deleted' });
         }
 
-        await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx: any) => {
           await tx.expenseItem.deleteMany({ where: { expenseClaimId: id } });
           await tx.expenseClaim.delete({ where: { id } });
         });

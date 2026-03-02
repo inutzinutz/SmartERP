@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../../lib/prisma';
-import { getUserFromRequest } from '../../../lib/auth';
-import { cors } from '../../../lib/cors';
+import prisma from '../../../_lib/prisma';
+import { getUserFromRequest } from '../../../_lib/auth';
+import { cors } from '../../../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -56,7 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const { customerId, items, notes, orderDate } = req.body;
 
-        const order = await prisma.$transaction(async (tx) => {
+        const order = await prisma.$transaction(async (tx: any) => {
           // If items are provided, replace them
           if (items && Array.isArray(items)) {
             // Delete existing items
@@ -75,7 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             const orderItems = items.map((item: any) => {
               const product = productMap.get(item.productId)!;
-              const unitPrice = item.unitPrice ?? (product.sellingPrice?.toNumber?.() ?? Number(product.sellingPrice ?? 0));
+              const unitPrice = item.unitPrice ?? ((product as any).sellingPrice?.toNumber?.() ?? Number((product as any).sellingPrice ?? 0));
               const quantity = Number(item.quantity);
               const discount = Number(item.discount ?? 0);
               const totalPrice = quantity * unitPrice - discount;
@@ -92,7 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             await tx.salesOrderItem.createMany({ data: orderItems });
 
-            const totalAmount = orderItems.reduce((sum, item) => sum + item.totalPrice, 0);
+            const totalAmount = orderItems.reduce((sum: number, item: any) => sum + item.totalPrice, 0);
 
             return tx.salesOrder.update({
               where: { id },
@@ -147,7 +147,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ message: 'Only draft orders can be confirmed' });
           }
 
-          const order = await prisma.$transaction(async (tx) => {
+          const order = await prisma.$transaction(async (tx: any) => {
             // Update order status
             const updated = await tx.salesOrder.update({
               where: { id },

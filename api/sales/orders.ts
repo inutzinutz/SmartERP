@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../lib/prisma';
-import { getUserFromRequest } from '../../lib/auth';
-import { cors } from '../../lib/cors';
+import prisma from '../../_lib/prisma';
+import { getUserFromRequest } from '../../_lib/auth';
+import { cors } from '../../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -97,7 +97,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Calculate totals
         const orderItems = items.map((item: any) => {
           const product = productMap.get(item.productId)!;
-          const unitPrice = item.unitPrice ?? (product.sellingPrice?.toNumber?.() ?? Number(product.sellingPrice ?? 0));
+          const unitPrice = item.unitPrice ?? ((product as any).sellingPrice?.toNumber?.() ?? Number((product as any).sellingPrice ?? 0));
           const quantity = Number(item.quantity);
           const discount = Number(item.discount ?? 0);
           const totalPrice = quantity * unitPrice - discount;
@@ -127,7 +127,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         const orderNumber = `SO-${String(nextNum).padStart(6, '0')}`;
 
-        const order = await prisma.$transaction(async (tx) => {
+        const order = await prisma.$transaction(async (tx: any) => {
           const salesOrder = await tx.salesOrder.create({
             data: {
               organizationId: orgId,

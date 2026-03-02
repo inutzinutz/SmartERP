@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../../lib/prisma';
-import { getUserFromRequest } from '../../../lib/auth';
-import { cors } from '../../../lib/cors';
+import prisma from '../../../_lib/prisma';
+import { getUserFromRequest } from '../../../_lib/auth';
+import { cors } from '../../../_lib/cors';
 
 async function getAccountBalances(
   orgId: string,
@@ -15,7 +15,7 @@ async function getAccountBalances(
   });
 
   const rows = await Promise.all(
-    accounts.map(async (account) => {
+    accounts.map(async (account: any) => {
       const agg = await prisma.journalEntryLine.aggregate({
         where: {
           accountId: account.id,
@@ -75,13 +75,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const revenueRows = await getAccountBalances(orgId, 'REVENUE', asOfDate, false);
     const expenseRows = await getAccountBalances(orgId, 'EXPENSE', asOfDate, true);
 
-    const totalRevenue = revenueRows.reduce((sum, r) => sum + r.amount, 0);
-    const totalExpenses = expenseRows.reduce((sum, r) => sum + r.amount, 0);
+    const totalRevenue = revenueRows.reduce((sum: number, r: any) => sum + r.amount, 0);
+    const totalExpenses = expenseRows.reduce((sum: number, r: any) => sum + r.amount, 0);
     const retainedEarnings = Math.round((totalRevenue - totalExpenses) * 100) / 100;
 
-    const totalAssets = assetRows.reduce((sum, r) => sum + r.amount, 0);
-    const totalLiabilities = liabilityRows.reduce((sum, r) => sum + r.amount, 0);
-    const totalEquity = equityRows.reduce((sum, r) => sum + r.amount, 0) + retainedEarnings;
+    const totalAssets = assetRows.reduce((sum: number, r: any) => sum + r.amount, 0);
+    const totalLiabilities = liabilityRows.reduce((sum: number, r: any) => sum + r.amount, 0);
+    const totalEquity = equityRows.reduce((sum: number, r: any) => sum + r.amount, 0) + retainedEarnings;
 
     return res.status(200).json({
       data: {

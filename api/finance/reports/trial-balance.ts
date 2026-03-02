@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../../lib/prisma';
-import { getUserFromRequest } from '../../../lib/auth';
-import { cors } from '../../../lib/cors';
+import prisma from '../../../_lib/prisma';
+import { getUserFromRequest } from '../../../_lib/auth';
+import { cors } from '../../../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -31,7 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Get aggregated journal entry lines for each account up to the asOfDate
     const accountBalances = await Promise.all(
-      accounts.map(async (account) => {
+      accounts.map(async (account: any) => {
         const aggregation = await prisma.journalEntryLine.aggregate({
           where: {
             accountId: account.id,
@@ -61,15 +61,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Filter out zero-balance accounts
     const nonZeroBalances = accountBalances.filter(
-      (a) => a.debit !== 0 || a.credit !== 0
+      (a: any) => a.debit !== 0 || a.credit !== 0
     );
 
     // Calculate totals
-    const totalDebits = nonZeroBalances.reduce((sum, a) => sum + a.debit, 0);
-    const totalCredits = nonZeroBalances.reduce((sum, a) => sum + a.credit, 0);
+    const totalDebits = nonZeroBalances.reduce((sum: number, a: any) => sum + a.debit, 0);
+    const totalCredits = nonZeroBalances.reduce((sum: number, a: any) => sum + a.credit, 0);
 
     // For trial balance display: show debit or credit balance per account
-    const trialBalanceRows = nonZeroBalances.map((a) => {
+    const trialBalanceRows = nonZeroBalances.map((a: any) => {
       const isDebitNormal = ['ASSET', 'EXPENSE'].includes(a.accountType);
       const netBalance = a.debit - a.credit;
 
@@ -80,8 +80,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       };
     });
 
-    const totalDebitBalance = trialBalanceRows.reduce((sum, r) => sum + r.debitBalance, 0);
-    const totalCreditBalance = trialBalanceRows.reduce((sum, r) => sum + r.creditBalance, 0);
+    const totalDebitBalance = trialBalanceRows.reduce((sum: number, r: any) => sum + r.debitBalance, 0);
+    const totalCreditBalance = trialBalanceRows.reduce((sum: number, r: any) => sum + r.creditBalance, 0);
 
     return res.status(200).json({
       data: {

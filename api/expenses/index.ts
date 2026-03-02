@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../lib/prisma';
-import { getUserFromRequest } from '../../lib/auth';
-import { cors } from '../../lib/cors';
+import prisma from '../../_lib/prisma';
+import { getUserFromRequest } from '../../_lib/auth';
+import { cors } from '../../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -100,7 +100,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const totalAmount = expenseItems.reduce((sum: number, item: any) => sum + item.amount, 0);
 
-        const claim = await prisma.$transaction(async (tx) => {
+        const claim = await prisma.$transaction(async (tx: any) => {
           return tx.expenseClaim.create({
             data: {
               organizationId: orgId,

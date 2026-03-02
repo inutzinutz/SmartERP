@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../lib/prisma';
-import { getUserFromRequest } from '../../lib/auth';
-import { cors } from '../../lib/cors';
+import prisma from '../../_lib/prisma';
+import { getUserFromRequest } from '../../_lib/auth';
+import { cors } from '../../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -116,7 +116,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     const totalOverdueReceivable = overdueReceivables.reduce(
-      (sum, r) => sum + (r.amount?.toNumber?.() ?? Number(r.amount ?? 0)),
+      (sum: number, r: any) => sum + (r.amount?.toNumber?.() ?? Number(r.amount ?? 0)),
       0
     );
 
@@ -135,7 +135,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     const totalOverduePayable = overduePayables.reduce(
-      (sum, p) => sum + (p.amount?.toNumber?.() ?? Number(p.amount ?? 0)),
+      (sum: number, p: any) => sum + (p.amount?.toNumber?.() ?? Number(p.amount ?? 0)),
       0
     );
 

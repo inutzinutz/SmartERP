@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../../lib/prisma';
-import { getUserFromRequest } from '../../../lib/auth';
-import { cors } from '../../../lib/cors';
+import prisma from '../../../_lib/prisma';
+import { getUserFromRequest } from '../../../_lib/auth';
+import { cors } from '../../../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -56,7 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const { supplierId, items, notes, expectedDate } = req.body;
 
-        const order = await prisma.$transaction(async (tx) => {
+        const order = await prisma.$transaction(async (tx: any) => {
           if (items && Array.isArray(items)) {
             await tx.purchaseOrderItem.deleteMany({ where: { purchaseOrderId: id } });
 
@@ -72,7 +72,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             const orderItems = items.map((item: any) => {
               const product = productMap.get(item.productId)!;
-              const unitPrice = item.unitPrice ?? (product.costPrice?.toNumber?.() ?? Number(product.costPrice ?? 0));
+              const unitPrice = item.unitPrice ?? ((product as any).costPrice?.toNumber?.() ?? Number((product as any).costPrice ?? 0));
               const quantity = Number(item.quantity);
               const totalPrice = quantity * unitPrice;
 
@@ -87,7 +87,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             await tx.purchaseOrderItem.createMany({ data: orderItems });
 
-            const totalAmount = orderItems.reduce((sum, item) => sum + item.totalPrice, 0);
+            const totalAmount = orderItems.reduce((sum: number, item: any) => sum + item.totalPrice, 0);
 
             return tx.purchaseOrder.update({
               where: { id },
@@ -141,7 +141,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ message: 'Only draft orders can be confirmed' });
           }
 
-          const order = await prisma.$transaction(async (tx) => {
+          const order = await prisma.$transaction(async (tx: any) => {
             const updated = await tx.purchaseOrder.update({
               where: { id },
               data: { status: 'CONFIRMED' },
@@ -187,9 +187,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(404).json({ message: 'Warehouse not found' });
           }
 
-          const order = await prisma.$transaction(async (tx) => {
+          const order = await prisma.$transaction(async (tx: any) => {
             // Add stock for each item
-            for (const item of existing.items) {
+            for (const item of existing.items as any[]) {
               const qty = item.quantity?.toNumber?.() ?? Number(item.quantity ?? 0);
 
               let stockItem = await tx.stockItem.findFirst({
