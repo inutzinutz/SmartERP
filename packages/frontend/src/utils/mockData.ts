@@ -107,8 +107,12 @@ export const mockPurchaseOrders = [
 ];
 
 // --- Accounts (Chart of Accounts) ---
-export const mockAccounts = [
-  { id: 'a1', code: '1000', name: 'Assets', type: 'ASSET', parentId: null, balance: 0, isActive: true, isSystem: true, children: [] as typeof mockAccounts },
+interface MockAccount {
+  id: string; code: string; name: string; type: string; parentId: string | null;
+  balance: number; isActive: boolean; isSystem: boolean; children?: MockAccount[];
+}
+export const mockAccounts: MockAccount[] = [
+  { id: 'a1', code: '1000', name: 'Assets', type: 'ASSET', parentId: null, balance: 0, isActive: true, isSystem: true, children: [] },
   { id: 'a1a', code: '1100', name: 'Cash', type: 'ASSET', parentId: 'a1', balance: 1500000, isActive: true, isSystem: false },
   { id: 'a1b', code: '1200', name: 'Bank Account', type: 'ASSET', parentId: 'a1', balance: 5000000, isActive: true, isSystem: false },
   { id: 'a1c', code: '1300', name: 'Accounts Receivable', type: 'ASSET', parentId: 'a1', balance: 850000, isActive: true, isSystem: false },
