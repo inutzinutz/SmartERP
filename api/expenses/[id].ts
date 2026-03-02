@@ -70,8 +70,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 expenseClaimId: id,
                 description: item.description,
                 amount,
-                category: item.category || null,
-                date: item.date ? new Date(item.date) : new Date(),
+                category: item.category || 'General',
+                expenseDate: item.expenseDate || item.date ? new Date(item.expenseDate || item.date) : new Date(),
                 receiptUrl: item.receiptUrl || null,
               };
             });

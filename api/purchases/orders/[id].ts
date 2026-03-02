@@ -72,7 +72,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             const orderItems = items.map((item: any) => {
               const product = productMap.get(item.productId)!;
-              const unitPrice = item.unitPrice ?? ((product as any).costPrice?.toNumber?.() ?? Number((product as any).costPrice ?? 0));
+              const toNum = (v: any): number => { if (v === null || v === undefined) return 0; if (typeof v === 'number') return v; if (typeof v.toNumber === 'function') return v.toNumber(); return Number(v) || 0; };
+              const unitPrice = item.unitPrice ?? toNum((product as any).costPrice);
               const quantity = Number(item.quantity);
               const totalAmount = quantity * unitPrice;
 
@@ -188,15 +189,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           const order = await prisma.$transaction(async (tx: any) => {
             // Add stock for each item
+            const toN = (v: any): number => { if (v === null || v === undefined) return 0; if (typeof v === 'number') return v; if (typeof v.toNumber === 'function') return v.toNumber(); return Number(v) || 0; };
             for (const item of existing.items as any[]) {
-              const qty = item.quantity?.toNumber?.() ?? Number(item.quantity ?? 0);
+              const qty = toN(item.quantity);
 
               let stockItem = await tx.stockItem.findFirst({
                 where: { productId: item.productId, warehouseId, product: { organizationId: orgId } },
               });
 
               if (stockItem) {
-                const currentQty = stockItem.quantity?.toNumber?.() ?? Number(stockItem.quantity ?? 0);
+                const currentQty = toN(stockItem.quantity);
                 await tx.stockItem.update({
                   where: { id: stockItem.id },
                   data: { quantity: currentQty + qty },

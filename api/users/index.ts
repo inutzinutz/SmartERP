@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import bcrypt from 'bcryptjs';
 import prisma from '../_lib/prisma';
 import { getUserFromRequest } from '../_lib/auth';
 import { cors } from '../_lib/cors';
@@ -73,18 +74,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       case 'POST': {
-        // Only admins can create users
-        if (user.role !== 'ADMIN') {
+        // Only admins and super admins can create users
+        if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
           return res.status(403).json({ message: 'Only admins can create users' });
         }
 
-        const { firstName, lastName, email, password, role, isActive } = req.body;
+        const body = req.body || {};
+        const { firstName, lastName, email, password, role, isActive } = body;
 
         if (!firstName || !lastName || !email) {
           return res.status(400).json({ message: 'firstName, lastName, and email are required' });
         }
 
-        const validRoles = ['ADMIN', 'MANAGER', 'ACCOUNTANT', 'WAREHOUSE_MANAGER', 'SALES_REP', 'PURCHASER', 'CASHIER', 'VIEWER'];
+        const validRoles = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'ACCOUNTANT', 'SALES', 'WAREHOUSE', 'STORE_MANAGER', 'STAFF'];
         if (role && !validRoles.includes(role)) {
           return res.status(400).json({
             message: `Invalid role. Must be one of: ${validRoles.join(', ')}`,
@@ -98,15 +100,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(409).json({ message: 'A user with this email already exists' });
         }
 
-        // In production, password should be hashed. This assumes the auth layer handles it.
+        const hashedPassword = await bcrypt.hash(password || 'Password123!', 10);
         const newUser = await prisma.user.create({
           data: {
             organization: { connect: { id: orgId } },
             firstName,
             lastName,
             email,
-            password: password || '', // auth layer should hash this
-            role: role || 'STAFF',
+            password: hashedPassword,
+            role: (role || 'STAFF') as any,
             isActive: isActive !== false,
           },
           select: {

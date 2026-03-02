@@ -57,11 +57,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
 
           // Verify debit = credit
+          const toNum = (val: any): number => {
+            if (val === null || val === undefined) return 0;
+            if (typeof val === 'number') return val;
+            if (typeof val.toNumber === 'function') return val.toNumber();
+            return Number(val) || 0;
+          };
           let totalDebit = 0;
           let totalCredit = 0;
           for (const line of existing.lines as any[]) {
-            totalDebit += line.debit?.toNumber?.() ?? Number(line.debit ?? 0);
-            totalCredit += line.credit?.toNumber?.() ?? Number(line.credit ?? 0);
+            totalDebit += toNum(line.debit);
+            totalCredit += toNum(line.credit);
           }
 
           if (Math.abs(totalDebit - totalCredit) > 0.01) {
@@ -121,12 +127,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 reference: `VOID-${existing.entryNumber}`,
                 isPosted: true,
                 lines: {
-                  create: existing.lines.map((line: any) => ({
-                    accountId: line.accountId,
-                    debit: line.credit?.toNumber?.() ?? Number(line.credit ?? 0),
-                    credit: line.debit?.toNumber?.() ?? Number(line.debit ?? 0),
-                    description: `Reversal: ${line.description || ''}`,
-                  })),
+                  create: existing.lines.map((line: any) => {
+                    const toN = (v: any): number => {
+                      if (v === null || v === undefined) return 0;
+                      if (typeof v === 'number') return v;
+                      if (typeof v.toNumber === 'function') return v.toNumber();
+                      return Number(v) || 0;
+                    };
+                    return {
+                      accountId: line.accountId,
+                      debit: toN(line.credit),
+                      credit: toN(line.debit),
+                      description: `Reversal: ${line.description || ''}`,
+                    };
+                  }),
                 },
               },
               include: {

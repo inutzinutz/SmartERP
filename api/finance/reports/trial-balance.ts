@@ -29,6 +29,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       orderBy: { code: 'asc' },
     });
 
+    // Helper to safely convert Prisma Decimal to number
+    const toNum = (val: any): number => {
+      if (val === null || val === undefined) return 0;
+      if (typeof val === 'number') return val;
+      if (typeof val.toNumber === 'function') return val.toNumber();
+      return Number(val) || 0;
+    };
+
     // Get aggregated journal entry lines for each account up to the asOfDate
     const accountBalances = await Promise.all(
       accounts.map(async (account: any) => {
@@ -43,8 +51,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           _sum: { debit: true, credit: true },
         });
 
-        const totalDebit = aggregation._sum?.debit?.toNumber?.() ?? Number(aggregation._sum?.debit ?? 0);
-        const totalCredit = aggregation._sum?.credit?.toNumber?.() ?? Number(aggregation._sum?.credit ?? 0);
+        const totalDebit = toNum(aggregation._sum?.debit);
+        const totalCredit = toNum(aggregation._sum?.credit);
 
         return {
           accountId: account.id,

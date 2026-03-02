@@ -41,6 +41,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       orderBy: { code: 'asc' },
     });
 
+    // Helper to safely convert Prisma Decimal to number
+    const toNum = (val: any): number => {
+      if (val === null || val === undefined) return 0;
+      if (typeof val === 'number') return val;
+      if (typeof val.toNumber === 'function') return val.toNumber();
+      return Number(val) || 0;
+    };
+
     // Calculate balances for revenue accounts
     const revenueRows = await Promise.all(
       revenueAccounts.map(async (account: any) => {
@@ -55,8 +63,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           _sum: { debit: true, credit: true },
         });
 
-        const debit = agg._sum?.debit?.toNumber?.() ?? Number(agg._sum?.debit ?? 0);
-        const credit = agg._sum?.credit?.toNumber?.() ?? Number(agg._sum?.credit ?? 0);
+        const debit = toNum(agg._sum?.debit);
+        const credit = toNum(agg._sum?.credit);
         // Revenue is credit-normal
         const balance = credit - debit;
 
@@ -83,8 +91,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           _sum: { debit: true, credit: true },
         });
 
-        const debit = agg._sum?.debit?.toNumber?.() ?? Number(agg._sum?.debit ?? 0);
-        const credit = agg._sum?.credit?.toNumber?.() ?? Number(agg._sum?.credit ?? 0);
+        const debit = toNum(agg._sum?.debit);
+        const credit = toNum(agg._sum?.credit);
         // Expense is debit-normal
         const balance = debit - credit;
 

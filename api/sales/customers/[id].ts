@@ -64,7 +64,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(404).json({ message: 'Customer not found' });
         }
 
-        const { name, email, phone, address, city, country, taxId, code, tier, creditLimit, notes } = req.body;
+        const { name, email, phone, address, taxId, code, tier, creditLimit, contactPerson, creditDays } = req.body;
 
         if (email && email !== existing.email) {
           const duplicate = await prisma.customer.findFirst({
@@ -75,6 +75,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
         }
 
+        if (code && code !== existing.code) {
+          const codeDup = await prisma.customer.findFirst({
+            where: { organizationId: orgId, code, id: { not: id } },
+          });
+          if (codeDup) {
+            return res.status(409).json({ message: 'A customer with this code already exists' });
+          }
+        }
+
         const customer = await prisma.customer.update({
           where: { id },
           data: {
@@ -82,13 +91,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ...(email !== undefined && { email }),
             ...(phone !== undefined && { phone }),
             ...(address !== undefined && { address }),
-            ...(city !== undefined && { city }),
-            ...(country !== undefined && { country }),
             ...(taxId !== undefined && { taxId }),
             ...(code !== undefined && { code }),
-            ...(tier !== undefined && { tier }),
-            ...(creditLimit !== undefined && { creditLimit }),
-            ...(notes !== undefined && { notes }),
+            ...(tier !== undefined && { tier: tier as any }),
+            ...(creditLimit !== undefined && { creditLimit: Number(creditLimit) }),
+            ...(contactPerson !== undefined && { contactPerson }),
+            ...(creditDays !== undefined && { creditDays: Number(creditDays) }),
           },
         });
 

@@ -46,7 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       case 'PUT': {
         // Users can update their own profile, admins can update anyone
-        if (id !== auth.sub && user.role !== 'ADMIN') {
+        if (id !== auth.sub && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
           return res.status(403).json({ message: 'Forbidden' });
         }
 
@@ -74,7 +74,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (lastName !== undefined) updateData.lastName = lastName;
         if (email !== undefined) updateData.email = email;
 
-        if (user.role === 'ADMIN') {
+        if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
           if (role !== undefined) updateData.role = role;
           if (isActive !== undefined) updateData.isActive = isActive;
         }
@@ -98,7 +98,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       case 'DELETE': {
-        if (user.role !== 'ADMIN') {
+        if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
           return res.status(403).json({ message: 'Only admins can delete users' });
         }
 

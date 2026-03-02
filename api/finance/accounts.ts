@@ -102,7 +102,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       case 'POST': {
-        const { code, name, type, parentId, isActive } = req.body;
+        const body = req.body || {};
+        const { code, name, type, parentId, isActive, currency } = body;
 
         if (!code || !name || !type) {
           return res.status(400).json({ message: 'code, name, and type are required' });
@@ -131,15 +132,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
         }
 
+        const createData: any = {
+          organization: { connect: { id: orgId } },
+          code,
+          name,
+          type: type as any,
+          isActive: isActive !== false,
+          balance: 0,
+        };
+        if (parentId) {
+          createData.parent = { connect: { id: parentId } };
+        }
+        if (currency) {
+          createData.currency = currency;
+        }
+
         const account = await prisma.account.create({
-          data: {
-            organization: { connect: { id: orgId } },
-            code,
-            name,
-            type,
-            parentId: parentId || null,
-            isActive: isActive !== false,
-          },
+          data: createData,
         });
 
         return res.status(201).json({ data: account });

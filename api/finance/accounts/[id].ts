@@ -60,8 +60,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           _sum: { credit: true },
         });
 
-        const totalDebit = debitSum._sum?.debit?.toNumber?.() ?? Number(debitSum._sum?.debit ?? 0);
-        const totalCredit = creditSum._sum?.credit?.toNumber?.() ?? Number(creditSum._sum?.credit ?? 0);
+        const toNum = (val: any): number => {
+          if (val === null || val === undefined) return 0;
+          if (typeof val === 'number') return val;
+          if (typeof val.toNumber === 'function') return val.toNumber();
+          return Number(val) || 0;
+        };
+        const totalDebit = toNum(debitSum._sum?.debit);
+        const totalCredit = toNum(creditSum._sum?.credit);
 
         // For ASSET and EXPENSE accounts, balance = debit - credit
         // For LIABILITY, EQUITY, REVENUE accounts, balance = credit - debit

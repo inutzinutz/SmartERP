@@ -64,7 +64,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(404).json({ message: 'Supplier not found' });
         }
 
-        const { name, email, phone, address, city, country, taxId, code, contactPerson, notes } = req.body;
+        const { name, email, phone, address, taxId, code, contactPerson, paymentTerms } = req.body;
 
         if (email && email !== existing.email) {
           const duplicate = await prisma.supplier.findFirst({
@@ -75,6 +75,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
         }
 
+        if (code && code !== existing.code) {
+          const codeDup = await prisma.supplier.findFirst({
+            where: { organizationId: orgId, code, id: { not: id } },
+          });
+          if (codeDup) {
+            return res.status(409).json({ message: 'A supplier with this code already exists' });
+          }
+        }
+
         const supplier = await prisma.supplier.update({
           where: { id },
           data: {
@@ -82,12 +91,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ...(email !== undefined && { email }),
             ...(phone !== undefined && { phone }),
             ...(address !== undefined && { address }),
-            ...(city !== undefined && { city }),
-            ...(country !== undefined && { country }),
             ...(taxId !== undefined && { taxId }),
             ...(code !== undefined && { code }),
             ...(contactPerson !== undefined && { contactPerson }),
-            ...(notes !== undefined && { notes }),
+            ...(paymentTerms !== undefined && { paymentTerms: Number(paymentTerms) }),
           },
         });
 
