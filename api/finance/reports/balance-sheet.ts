@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../../_lib/prisma';
-import { getUserFromRequest } from '../../../_lib/auth';
-import { cors } from '../../../_lib/cors';
+import prisma from '../../_lib/prisma';
+import { getUserFromRequest } from '../../_lib/auth';
+import { cors } from '../../_lib/cors';
 
 async function getAccountBalances(
   orgId: string,
@@ -10,7 +10,7 @@ async function getAccountBalances(
   isDebitNormal: boolean
 ) {
   const accounts = await prisma.account.findMany({
-    where: { organizationId: orgId, type, isActive: true },
+    where: { organizationId: orgId, type: type as any, isActive: true },
     orderBy: { code: 'asc' },
   });
 
@@ -20,16 +20,15 @@ async function getAccountBalances(
         where: {
           accountId: account.id,
           journalEntry: {
-            organizationId: orgId,
-            status: 'POSTED',
+            isPosted: true,
             date: { lte: asOfDate },
           },
         },
         _sum: { debit: true, credit: true },
       });
 
-      const debit = agg._sum.debit?.toNumber?.() ?? Number(agg._sum.debit ?? 0);
-      const credit = agg._sum.credit?.toNumber?.() ?? Number(agg._sum.credit ?? 0);
+      const debit = agg._sum?.debit?.toNumber?.() ?? Number(agg._sum?.debit ?? 0);
+      const credit = agg._sum?.credit?.toNumber?.() ?? Number(agg._sum?.credit ?? 0);
       const balance = isDebitNormal ? debit - credit : credit - debit;
 
       return {

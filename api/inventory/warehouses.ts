@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../_lib/prisma';
-import { getUserFromRequest } from '../../_lib/auth';
-import { cors } from '../../_lib/cors';
+import prisma from '../_lib/prisma';
+import { getUserFromRequest } from '../_lib/auth';
+import { cors } from '../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -30,7 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (search) {
           where.OR = [
             { name: { contains: search, mode: 'insensitive' } },
-            { location: { contains: search, mode: 'insensitive' } },
+            { address: { contains: search, mode: 'insensitive' } },
           ];
         }
 
@@ -59,7 +59,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       case 'POST': {
-        const { name, location, description, isActive } = req.body;
+        const { name, address, isActive } = req.body;
 
         if (!name) {
           return res.status(400).json({ message: 'Warehouse name is required' });
@@ -74,10 +74,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const warehouse = await prisma.warehouse.create({
           data: {
-            organizationId: orgId,
+            organization: { connect: { id: orgId } },
             name,
-            location: location || null,
-            description: description || null,
+            code: `WH-${Date.now()}`,
+            address: address || null,
             isActive: isActive !== false,
           },
         });

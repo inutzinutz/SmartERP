@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../_lib/prisma';
-import { getUserFromRequest } from '../../_lib/auth';
-import { cors } from '../../_lib/cors';
+import prisma from '../_lib/prisma';
+import { getUserFromRequest } from '../_lib/auth';
+import { cors } from '../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -28,7 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Monthly sales data
     const orders = await prisma.salesOrder.findMany({
       where: {
-        organizationId: orgId,
+        customer: { organizationId: orgId },
         createdAt: { gte: startDate },
         status: { in: ['CONFIRMED', 'DELIVERED'] },
       },
@@ -49,7 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const d = new Date(order.createdAt);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       if (monthlySales[key]) {
-        monthlySales[key].revenue += order.totalAmount?.toNumber?.() ?? Number(order.totalAmount ?? 0);
+        monthlySales[key].revenue += Number(order.totalAmount ?? 0);
         monthlySales[key].orderCount += 1;
       }
     }
@@ -60,7 +60,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const topCustomers = await prisma.salesOrder.groupBy({
       by: ['customerId'],
       where: {
-        organizationId: orgId,
+        customer: { organizationId: orgId },
         createdAt: { gte: startDate },
         status: { in: ['CONFIRMED', 'DELIVERED'] },
       },
@@ -80,38 +80,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const topCustomersData = topCustomers.map((c) => ({
       customerId: c.customerId,
       customerName: customerMap.get(c.customerId) ?? 'Unknown',
-      totalRevenue: c._sum.totalAmount?.toNumber?.() ?? Number(c._sum.totalAmount ?? 0),
+      totalRevenue: Number(c._sum.totalAmount ?? 0),
       orderCount: c._count.id,
     }));
 
-    // Top products by quantity sold
+    // Top products by revenue (using totalAmount on SalesOrderItem)
     const topProducts = await prisma.salesOrderItem.groupBy({
       by: ['productId'],
       where: {
         salesOrder: {
-          organizationId: orgId,
+          customer: { organizationId: orgId },
           createdAt: { gte: startDate },
           status: { in: ['CONFIRMED', 'DELIVERED'] },
         },
       },
-      _sum: { quantity: true, totalPrice: true },
-      orderBy: { _sum: { totalPrice: 'desc' } },
+      _sum: { quantity: true, totalAmount: true },
+      orderBy: { _sum: { totalAmount: 'desc' } },
       take: 10,
     });
 
     const productIds = topProducts.map((p) => p.productId);
     const products = await prisma.product.findMany({
       where: { id: { in: productIds } },
-      select: { id: true, name: true, sku: true },
+      select: { id: true, name: true, code: true },
     });
     const productMap = new Map(products.map((p) => [p.id, p]));
 
     const topProductsData = topProducts.map((p) => ({
       productId: p.productId,
       productName: productMap.get(p.productId)?.name ?? 'Unknown',
-      sku: productMap.get(p.productId)?.sku ?? '',
-      totalQuantity: p._sum.quantity?.toNumber?.() ?? Number(p._sum.quantity ?? 0),
-      totalRevenue: p._sum.totalPrice?.toNumber?.() ?? Number(p._sum.totalPrice ?? 0),
+      code: productMap.get(p.productId)?.code ?? '',
+      totalQuantity: Number(p._sum.quantity ?? 0),
+      totalRevenue: Number(p._sum.totalAmount ?? 0),
     }));
 
     return res.status(200).json({

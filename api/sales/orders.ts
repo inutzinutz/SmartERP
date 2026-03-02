@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../_lib/prisma';
-import { getUserFromRequest } from '../../_lib/auth';
-import { cors } from '../../_lib/cors';
+import prisma from '../_lib/prisma';
+import { getUserFromRequest } from '../_lib/auth';
+import { cors } from '../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -27,7 +27,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const sortBy = (req.query.sortBy as string) || 'createdAt';
         const sortOrder = (req.query.sortOrder as string) === 'asc' ? 'asc' : 'desc';
 
-        const where: any = { organizationId: orgId };
+        const where: any = { customer: { organizationId: orgId } };
 
         if (status) where.status = status;
         if (customerId) where.customerId = customerId;
@@ -100,22 +100,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const unitPrice = item.unitPrice ?? ((product as any).sellingPrice?.toNumber?.() ?? Number((product as any).sellingPrice ?? 0));
           const quantity = Number(item.quantity);
           const discount = Number(item.discount ?? 0);
-          const totalPrice = quantity * unitPrice - discount;
+          const totalAmount = quantity * unitPrice - discount;
 
           return {
             productId: item.productId,
             quantity,
             unitPrice,
             discount,
-            totalPrice,
+            totalAmount,
           };
         });
 
-        const totalAmount = orderItems.reduce((sum: number, item: any) => sum + item.totalPrice, 0);
+        const totalOrderAmount = orderItems.reduce((sum: number, item: any) => sum + item.totalAmount, 0);
 
         // Generate order number
         const lastOrder = await prisma.salesOrder.findFirst({
-          where: { organizationId: orgId },
+          where: { customer: { organizationId: orgId } },
           orderBy: { createdAt: 'desc' },
           select: { orderNumber: true },
         });
@@ -130,11 +130,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const order = await prisma.$transaction(async (tx: any) => {
           const salesOrder = await tx.salesOrder.create({
             data: {
-              organizationId: orgId,
               orderNumber,
               customerId,
               status: 'DRAFT',
-              totalAmount,
+              totalAmount: totalOrderAmount,
               notes: notes || null,
               orderDate: orderDate ? new Date(orderDate) : new Date(),
               createdBy: auth.sub,
@@ -146,7 +145,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               customer: { select: { id: true, name: true } },
               items: {
                 include: {
-                  product: { select: { id: true, name: true, sku: true } },
+                  product: { select: { id: true, name: true, code: true } },
                 },
               },
             },

@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../_lib/prisma';
-import { getUserFromRequest } from '../../_lib/auth';
-import { cors } from '../../_lib/cors';
+import prisma from '../_lib/prisma';
+import { getUserFromRequest } from '../_lib/auth';
+import { cors } from '../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -28,7 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const sortBy = (req.query.sortBy as string) || 'createdAt';
         const sortOrder = (req.query.sortOrder as string) === 'asc' ? 'asc' : 'desc';
 
-        const where: any = { organizationId: orgId };
+        const where: any = { product: { organizationId: orgId } };
 
         if (type) where.type = type;
         if (warehouseId) where.warehouseId = warehouseId;
@@ -46,9 +46,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           prisma.stockMovement.findMany({
             where,
             include: {
-              product: { select: { id: true, name: true, sku: true } },
+              product: { select: { id: true, name: true, code: true } },
               warehouse: { select: { id: true, name: true } },
-              createdByUser: { select: { id: true, name: true } },
             },
             orderBy: { [sortBy]: sortOrder },
             skip: (page - 1) * limit,
@@ -102,17 +101,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const result = await prisma.$transaction(async (tx: any) => {
           // Find or create stock item
           let stockItem = await tx.stockItem.findFirst({
-            where: { productId, warehouseId, organizationId: orgId },
+            where: { productId, warehouseId, product: { organizationId: orgId } },
           });
 
           if (!stockItem) {
             stockItem = await tx.stockItem.create({
               data: {
-                organizationId: orgId,
                 productId,
                 warehouseId,
                 quantity: 0,
-                reorderLevel: 0,
               },
             });
           }
@@ -147,17 +144,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           // Create the movement record
           const movement = await tx.stockMovement.create({
             data: {
-              organizationId: orgId,
               productId,
               warehouseId,
               type,
               quantity: qty,
               reference: reference || null,
               notes: notes || null,
-              createdBy: auth.sub,
             },
             include: {
-              product: { select: { id: true, name: true, sku: true } },
+              product: { select: { id: true, name: true, code: true } },
               warehouse: { select: { id: true, name: true } },
             },
           });

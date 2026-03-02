@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../../_lib/prisma';
-import { getUserFromRequest } from '../../../_lib/auth';
-import { cors } from '../../../_lib/cors';
+import prisma from '../../_lib/prisma';
+import { getUserFromRequest } from '../../_lib/auth';
+import { cors } from '../../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -27,7 +27,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           include: {
             stockItems: {
               include: {
-                product: { select: { id: true, name: true, sku: true, unit: true, costPrice: true } },
+                product: { select: { id: true, name: true, code: true, unit: true, costPrice: true } },
               },
             },
             _count: { select: { stockItems: true, stockMovements: true } },
@@ -49,7 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(404).json({ message: 'Warehouse not found' });
         }
 
-        const { name, location, description, isActive } = req.body;
+        const { name, address, description, isActive } = req.body;
 
         if (name && name !== existing.name) {
           const duplicate = await prisma.warehouse.findFirst({
@@ -64,7 +64,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           where: { id },
           data: {
             ...(name !== undefined && { name }),
-            ...(location !== undefined && { location }),
+            ...(address !== undefined && { address }),
             ...(description !== undefined && { description }),
             ...(isActive !== undefined && { isActive }),
           },

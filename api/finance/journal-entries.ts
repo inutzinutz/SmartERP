@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../_lib/prisma';
-import { getUserFromRequest } from '../../_lib/auth';
-import { cors } from '../../_lib/cors';
+import prisma from '../_lib/prisma';
+import { getUserFromRequest } from '../_lib/auth';
+import { cors } from '../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -28,9 +28,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const sortBy = (req.query.sortBy as string) || 'date';
         const sortOrder = (req.query.sortOrder as string) === 'asc' ? 'asc' : 'desc';
 
-        const where: any = { organizationId: orgId };
+        const where: any = { lines: { some: { account: { organizationId: orgId } } } };
 
-        if (status) where.status = status;
+        if (status) where.isPosted = status === 'POSTED';
 
         if (startDate || endDate) {
           where.date = {};
@@ -55,7 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   account: { select: { id: true, code: true, name: true } },
                 },
               },
-              createdByUser: { select: { id: true, name: true } },
+
             },
             orderBy: { [sortBy]: sortOrder },
             skip: (page - 1) * limit,
@@ -127,7 +127,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // Generate entry number
         const lastEntry = await prisma.journalEntry.findFirst({
-          where: { organizationId: orgId },
+          where: { lines: { some: { account: { organizationId: orgId } } } },
           orderBy: { createdAt: 'desc' },
           select: { entryNumber: true },
         });
@@ -142,14 +142,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const entry = await prisma.$transaction(async (tx: any) => {
           return tx.journalEntry.create({
             data: {
-              organizationId: orgId,
               entryNumber,
               date: date ? new Date(date) : new Date(),
               description: description || null,
               reference: reference || null,
-              status: 'DRAFT',
-              totalAmount: totalDebit,
-              createdBy: auth.sub,
+              isPosted: false,
               lines: {
                 create: lines.map((line: any) => ({
                   accountId: line.accountId,

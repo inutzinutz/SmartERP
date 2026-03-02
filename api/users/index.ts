@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../_lib/prisma';
-import { getUserFromRequest } from '../../_lib/auth';
-import { cors } from '../../_lib/cors';
+import prisma from '../_lib/prisma';
+import { getUserFromRequest } from '../_lib/auth';
+import { cors } from '../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -24,7 +24,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const search = (req.query.search as string) || '';
         const role = req.query.role as string;
         const isActive = req.query.isActive !== undefined ? req.query.isActive === 'true' : undefined;
-        const sortBy = (req.query.sortBy as string) || 'name';
+        const sortBy = (req.query.sortBy as string) || 'firstName';
         const sortOrder = (req.query.sortOrder as string) === 'desc' ? 'desc' : 'asc';
 
         const where: any = { organizationId: orgId };
@@ -34,7 +34,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (search) {
           where.OR = [
-            { name: { contains: search, mode: 'insensitive' } },
+            { firstName: { contains: search, mode: 'insensitive' } },
+            { lastName: { contains: search, mode: 'insensitive' } },
             { email: { contains: search, mode: 'insensitive' } },
           ];
         }
@@ -44,7 +45,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             where,
             select: {
               id: true,
-              name: true,
+              firstName: true,
+              lastName: true,
               email: true,
               role: true,
               isActive: true,
@@ -76,10 +78,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(403).json({ message: 'Only admins can create users' });
         }
 
-        const { name, email, password, role, isActive } = req.body;
+        const { firstName, lastName, email, password, role, isActive } = req.body;
 
-        if (!name || !email) {
-          return res.status(400).json({ message: 'Name and email are required' });
+        if (!firstName || !lastName || !email) {
+          return res.status(400).json({ message: 'firstName, lastName, and email are required' });
         }
 
         const validRoles = ['ADMIN', 'MANAGER', 'ACCOUNTANT', 'WAREHOUSE_MANAGER', 'SALES_REP', 'PURCHASER', 'CASHIER', 'VIEWER'];
@@ -100,15 +102,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const newUser = await prisma.user.create({
           data: {
             organizationId: orgId,
-            name,
+            firstName,
+            lastName,
             email,
-            passwordHash: password || '', // auth layer should hash this
-            role: role || 'VIEWER',
+            password: password || '', // auth layer should hash this
+            role: role || 'STAFF',
             isActive: isActive !== false,
           },
           select: {
             id: true,
-            name: true,
+            firstName: true,
+            lastName: true,
             email: true,
             role: true,
             isActive: true,

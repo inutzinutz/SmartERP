@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../_lib/prisma';
-import { getUserFromRequest } from '../../_lib/auth';
-import { cors } from '../../_lib/cors';
+import prisma from '../_lib/prisma';
+import { getUserFromRequest } from '../_lib/auth';
+import { cors } from '../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -64,7 +64,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       case 'POST': {
-        const { name, email, phone, address, city, country, taxId, code, tier, creditLimit, notes } = req.body;
+        const { name, email, phone, address, taxId, code, tier, creditLimit } = req.body;
 
         if (!name) {
           return res.status(400).json({ message: 'Customer name is required' });
@@ -86,13 +86,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             email: email || null,
             phone: phone || null,
             address: address || null,
-            city: city || null,
-            country: country || null,
             taxId: taxId || null,
             code: code || null,
             tier: tier || 'STANDARD',
             creditLimit: creditLimit ?? null,
-            notes: notes || null,
           },
         });
 

@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../_lib/prisma';
-import { getUserFromRequest } from '../../_lib/auth';
-import { cors } from '../../_lib/cors';
+import prisma from '../_lib/prisma';
+import { getUserFromRequest } from '../_lib/auth';
+import { cors } from '../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -27,7 +27,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const sortBy = (req.query.sortBy as string) || 'createdAt';
         const sortOrder = (req.query.sortOrder as string) === 'asc' ? 'asc' : 'desc';
 
-        const where: any = { organizationId: orgId };
+        const where: any = { user: { organizationId: orgId } };
 
         // Regular users only see their own expenses
         if (!all || !['ADMIN', 'MANAGER'].includes(user.role)) {
@@ -47,7 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           prisma.expenseClaim.findMany({
             where,
             include: {
-              user: { select: { id: true, name: true, email: true } },
+              user: { select: { id: true, firstName: true, lastName: true, email: true } },
               items: true,
               _count: { select: { items: true } },
             },
@@ -103,18 +103,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const claim = await prisma.$transaction(async (tx: any) => {
           return tx.expenseClaim.create({
             data: {
-              organizationId: orgId,
               userId: auth.sub,
               title,
               description: description || null,
               totalAmount,
-              status: 'DRAFT',
+              status: 'PENDING',
               items: {
                 create: expenseItems,
               },
             },
             include: {
-              user: { select: { id: true, name: true, email: true } },
+              user: { select: { id: true, firstName: true, lastName: true, email: true } },
               items: true,
             },
           });

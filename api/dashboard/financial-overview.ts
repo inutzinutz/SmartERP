@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../_lib/prisma';
-import { getUserFromRequest } from '../../_lib/auth';
-import { cors } from '../../_lib/cors';
+import prisma from '../_lib/prisma';
+import { getUserFromRequest } from '../_lib/auth';
+import { cors } from '../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -28,7 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Monthly revenue from confirmed/delivered sales
     const salesOrders = await prisma.salesOrder.findMany({
       where: {
-        organizationId: orgId,
+        customer: { organizationId: orgId },
         createdAt: { gte: startDate },
         status: { in: ['CONFIRMED', 'DELIVERED'] },
       },
@@ -36,25 +36,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     // Monthly expenses from approved expense claims
-    const expenseItems = await prisma.expenseItem.findMany({
+    const expenseClaims = await prisma.expenseClaim.findMany({
       where: {
-        expenseClaim: {
-          organizationId: orgId,
-          createdAt: { gte: startDate },
-          status: 'APPROVED',
-        },
+        user: { organizationId: orgId },
+        createdAt: { gte: startDate },
+        status: 'APPROVED',
       },
-      include: {
-        expenseClaim: { select: { createdAt: true } },
-      },
+      select: { createdAt: true, totalAmount: true },
     });
 
     // Purchase orders as cost of goods
     const purchaseOrders = await prisma.purchaseOrder.findMany({
       where: {
-        organizationId: orgId,
+        supplier: { organizationId: orgId },
         createdAt: { gte: startDate },
-        status: { in: ['CONFIRMED', 'RECEIVED'] },
+        status: { in: ['CONFIRMED', 'DELIVERED'] },
       },
       select: { createdAt: true, totalAmount: true },
     });
@@ -71,15 +67,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const d = new Date(order.createdAt);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       if (monthlyData[key]) {
-        monthlyData[key].revenue += order.totalAmount?.toNumber?.() ?? Number(order.totalAmount ?? 0);
+        monthlyData[key].revenue += Number(order.totalAmount ?? 0);
       }
     }
 
-    for (const item of expenseItems) {
-      const d = new Date(item.expenseClaim.createdAt);
+    for (const claim of expenseClaims) {
+      const d = new Date(claim.createdAt);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       if (monthlyData[key]) {
-        monthlyData[key].expenses += item.amount?.toNumber?.() ?? Number(item.amount ?? 0);
+        monthlyData[key].expenses += Number(claim.totalAmount ?? 0);
       }
     }
 
@@ -87,7 +83,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const d = new Date(po.createdAt);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       if (monthlyData[key]) {
-        monthlyData[key].purchases += po.totalAmount?.toNumber?.() ?? Number(po.totalAmount ?? 0);
+        monthlyData[key].purchases += Number(po.totalAmount ?? 0);
       }
     }
 
@@ -104,7 +100,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Overdue receivables
     const overdueReceivables = await prisma.receivable.findMany({
       where: {
-        organizationId: orgId,
+        customer: { organizationId: orgId },
         status: { in: ['PENDING', 'OVERDUE'] },
         dueDate: { lt: now },
       },
@@ -116,14 +112,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     const totalOverdueReceivable = overdueReceivables.reduce(
-      (sum: number, r: any) => sum + (r.amount?.toNumber?.() ?? Number(r.amount ?? 0)),
+      (sum: number, r) => sum + Number(r.amount ?? 0),
       0
     );
 
     // Overdue payables
     const overduePayables = await prisma.payable.findMany({
       where: {
-        organizationId: orgId,
+        supplier: { organizationId: orgId },
         status: { in: ['PENDING', 'OVERDUE'] },
         dueDate: { lt: now },
       },
@@ -135,13 +131,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     const totalOverduePayable = overduePayables.reduce(
-      (sum: number, p: any) => sum + (p.amount?.toNumber?.() ?? Number(p.amount ?? 0)),
+      (sum: number, p) => sum + Number(p.amount ?? 0),
       0
     );
 
     // Recent payments
     const recentPayments = await prisma.payment.findMany({
-      where: { organizationId: orgId },
       orderBy: { createdAt: 'desc' },
       take: 10,
     });
@@ -155,7 +150,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           items: overdueReceivables.map((r) => ({
             id: r.id,
             customerName: r.customer?.name ?? 'N/A',
-            amount: r.amount?.toNumber?.() ?? Number(r.amount ?? 0),
+            amount: Number(r.amount ?? 0),
             dueDate: r.dueDate,
           })),
         },
@@ -165,14 +160,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           items: overduePayables.map((p) => ({
             id: p.id,
             supplierName: p.supplier?.name ?? 'N/A',
-            amount: p.amount?.toNumber?.() ?? Number(p.amount ?? 0),
+            amount: Number(p.amount ?? 0),
             dueDate: p.dueDate,
           })),
         },
         recentPayments: recentPayments.map((p) => ({
           id: p.id,
-          amount: p.amount?.toNumber?.() ?? Number(p.amount ?? 0),
-          method: p.method,
+          amount: Number(p.amount ?? 0),
+          paymentMethod: p.paymentMethod,
           reference: p.reference,
           createdAt: p.createdAt,
         })),

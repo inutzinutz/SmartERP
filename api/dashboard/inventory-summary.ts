@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../_lib/prisma';
-import { getUserFromRequest } from '../../_lib/auth';
-import { cors } from '../../_lib/cors';
+import prisma from '../_lib/prisma';
+import { getUserFromRequest } from '../_lib/auth';
+import { cors } from '../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -23,9 +23,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Total stock value
     const stockItems = await prisma.stockItem.findMany({
-      where: { organizationId: orgId },
+      where: { product: { organizationId: orgId } },
       include: {
-        product: { select: { name: true, sku: true, costPrice: true } },
+        product: { select: { name: true, code: true, costPrice: true, minStock: true } },
         warehouse: { select: { name: true } },
       },
     });
@@ -34,26 +34,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const lowStockItems: Array<{
       productId: string;
       productName: string;
-      sku: string;
+      code: string;
       warehouseName: string;
       quantity: number;
-      reorderLevel: number;
+      minStock: number;
     }> = [];
 
     for (const item of stockItems) {
-      const qty = item.quantity?.toNumber?.() ?? Number(item.quantity ?? 0);
-      const cost = item.product.costPrice?.toNumber?.() ?? Number(item.product.costPrice ?? 0);
+      const qty = Number(item.quantity ?? 0);
+      const cost = Number(item.product.costPrice ?? 0);
       totalStockValue += qty * cost;
 
-      const reorderLevel = item.reorderLevel?.toNumber?.() ?? Number(item.reorderLevel ?? 0);
-      if (qty <= reorderLevel) {
+      if (qty <= item.product.minStock) {
         lowStockItems.push({
           productId: item.productId,
           productName: item.product.name,
-          sku: item.product.sku ?? '',
+          code: item.product.code,
           warehouseName: item.warehouse.name,
           quantity: qty,
-          reorderLevel,
+          minStock: item.product.minStock,
         });
       }
     }
@@ -64,14 +63,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       select: {
         id: true,
         name: true,
-        location: true,
+        address: true,
         isActive: true,
         _count: { select: { stockItems: true } },
       },
     });
 
     const warehouseSummary = await Promise.all(
-      warehouses.map(async (wh: any) => {
+      warehouses.map(async (wh) => {
         const whStock = await prisma.stockItem.findMany({
           where: { warehouseId: wh.id },
           include: { product: { select: { costPrice: true } } },
@@ -80,8 +79,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         let warehouseValue = 0;
         let totalQuantity = 0;
         for (const item of whStock) {
-          const qty = item.quantity?.toNumber?.() ?? Number(item.quantity ?? 0);
-          const cost = item.product.costPrice?.toNumber?.() ?? Number(item.product.costPrice ?? 0);
+          const qty = Number(item.quantity ?? 0);
+          const cost = Number(item.product.costPrice ?? 0);
           warehouseValue += qty * cost;
           totalQuantity += qty;
         }
@@ -89,7 +88,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return {
           id: wh.id,
           name: wh.name,
-          location: wh.location,
+          address: wh.address,
           isActive: wh.isActive,
           productCount: wh._count.stockItems,
           totalQuantity,
@@ -100,11 +99,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Recent movements
     const recentMovements = await prisma.stockMovement.findMany({
-      where: { organizationId: orgId },
+      where: { product: { organizationId: orgId } },
       orderBy: { createdAt: 'desc' },
       take: 10,
       include: {
-        product: { select: { name: true, sku: true } },
+        product: { select: { name: true, code: true } },
         warehouse: { select: { name: true } },
       },
     });
@@ -119,10 +118,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         recentMovements: recentMovements.map((m) => ({
           id: m.id,
           productName: m.product.name,
-          sku: m.product.sku,
+          code: m.product.code,
           warehouseName: m.warehouse.name,
           type: m.type,
-          quantity: m.quantity?.toNumber?.() ?? Number(m.quantity ?? 0),
+          quantity: Number(m.quantity ?? 0),
           reference: m.reference,
           createdAt: m.createdAt,
         })),

@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../_lib/prisma';
-import { getUserFromRequest } from '../../_lib/auth';
-import { cors } from '../../_lib/cors';
+import prisma from '../_lib/prisma';
+import { getUserFromRequest } from '../_lib/auth';
+import { cors } from '../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -47,17 +47,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       prisma.warehouse.count({ where: { organizationId: orgId } }),
       prisma.user.count({ where: { organizationId: orgId, isActive: true } }),
       prisma.salesOrder.count({
-        where: { organizationId: orgId, createdAt: { gte: startOfMonth } },
+        where: { customer: { organizationId: orgId }, createdAt: { gte: startOfMonth } },
       }),
       prisma.salesOrder.count({
         where: {
-          organizationId: orgId,
+          customer: { organizationId: orgId },
           createdAt: { gte: startOfLastMonth, lte: endOfLastMonth },
         },
       }),
       prisma.salesOrder.aggregate({
         where: {
-          organizationId: orgId,
+          customer: { organizationId: orgId },
           createdAt: { gte: startOfMonth },
           status: { in: ['CONFIRMED', 'DELIVERED'] },
         },
@@ -65,28 +65,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }),
       prisma.salesOrder.aggregate({
         where: {
-          organizationId: orgId,
+          customer: { organizationId: orgId },
           createdAt: { gte: startOfLastMonth, lte: endOfLastMonth },
           status: { in: ['CONFIRMED', 'DELIVERED'] },
         },
         _sum: { totalAmount: true },
       }),
       prisma.approval.count({
-        where: { organizationId: orgId, status: 'PENDING' },
+        where: { approver: { organizationId: orgId }, status: 'PENDING' },
       }),
       prisma.stockItem.count({
         where: {
-          organizationId: orgId,
-          quantity: { lte: prisma.stockItem.fields.reorderLevel },
+          product: { organizationId: orgId },
+          quantity: { lte: 10 },
         },
-      }).catch(() =>
-        prisma.stockItem.count({
-          where: { organizationId: orgId, quantity: { lte: 10 } },
-        })
-      ),
+      }),
       prisma.receivable.aggregate({
         where: {
-          organizationId: orgId,
+          customer: { organizationId: orgId },
           status: { in: ['PENDING', 'OVERDUE'] },
           dueDate: { lt: now },
         },
@@ -94,7 +90,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }),
       prisma.payable.aggregate({
         where: {
-          organizationId: orgId,
+          supplier: { organizationId: orgId },
           status: { in: ['PENDING', 'OVERDUE'] },
           dueDate: { lt: now },
         },
@@ -102,8 +98,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }),
     ]);
 
-    const currentRevenue = currentMonthRevenue._sum.totalAmount?.toNumber?.() ?? Number(currentMonthRevenue._sum.totalAmount ?? 0);
-    const lastRevenue = lastMonthRevenue._sum.totalAmount?.toNumber?.() ?? Number(lastMonthRevenue._sum.totalAmount ?? 0);
+    const currentRevenue = Number(currentMonthRevenue._sum.totalAmount ?? 0);
+    const lastRevenue = Number(lastMonthRevenue._sum.totalAmount ?? 0);
     const revenueGrowth = lastRevenue > 0 ? ((currentRevenue - lastRevenue) / lastRevenue) * 100 : 0;
     const orderGrowth = lastMonthOrders > 0 ? ((currentMonthOrders - lastMonthOrders) / lastMonthOrders) * 100 : 0;
 
@@ -127,8 +123,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         alerts: {
           pendingApprovals,
           lowStockCount,
-          overdueReceivables: overdueReceivables._sum.amount?.toNumber?.() ?? Number(overdueReceivables._sum.amount ?? 0),
-          overduePayables: overduePayables._sum.amount?.toNumber?.() ?? Number(overduePayables._sum.amount ?? 0),
+          overdueReceivables: Number(overdueReceivables._sum.amount ?? 0),
+          overduePayables: Number(overduePayables._sum.amount ?? 0),
         },
       },
     });

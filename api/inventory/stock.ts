@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../_lib/prisma';
-import { getUserFromRequest } from '../../_lib/auth';
-import { cors } from '../../_lib/cors';
+import prisma from '../_lib/prisma';
+import { getUserFromRequest } from '../_lib/auth';
+import { cors } from '../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -29,7 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const sortBy = (req.query.sortBy as string) || 'product';
     const sortOrder = (req.query.sortOrder as string) === 'asc' ? 'asc' : 'desc';
 
-    const where: any = { organizationId: orgId };
+    const where: any = { product: { organizationId: orgId } };
 
     if (warehouseId) {
       where.warehouseId = warehouseId;
@@ -39,7 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       where.product = {
         OR: [
           { name: { contains: search, mode: 'insensitive' } },
-          { sku: { contains: search, mode: 'insensitive' } },
+          { code: { contains: search, mode: 'insensitive' } },
         ],
       };
     }
@@ -57,8 +57,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       prisma.stockItem.findMany({
         where,
         include: {
-          product: { select: { id: true, name: true, sku: true, unit: true, costPrice: true } },
-          warehouse: { select: { id: true, name: true, location: true } },
+          product: { select: { id: true, name: true, code: true, unit: true, costPrice: true, minStock: true } },
+          warehouse: { select: { id: true, name: true, address: true } },
         },
         orderBy: orderByMap[sortBy] || { createdAt: 'desc' },
         ...(lowStockOnly ? {} : { skip: (page - 1) * limit, take: limit }),
@@ -71,8 +71,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (lowStockOnly) {
       items = allItems.filter((item) => {
         const qty = item.quantity?.toNumber?.() ?? Number(item.quantity ?? 0);
-        const reorder = item.reorderLevel?.toNumber?.() ?? Number(item.reorderLevel ?? 0);
-        return qty <= reorder;
+        const minStock = item.product.minStock ?? 0;
+        return qty <= minStock;
       });
       const filtered = items.slice((page - 1) * limit, page * limit);
       return res.status(200).json({
@@ -81,7 +81,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           product: item.product,
           warehouse: item.warehouse,
           quantity: item.quantity?.toNumber?.() ?? Number(item.quantity ?? 0),
-          reorderLevel: item.reorderLevel?.toNumber?.() ?? Number(item.reorderLevel ?? 0),
+          minStock: item.product.minStock ?? 0,
           stockValue:
             (item.quantity?.toNumber?.() ?? Number(item.quantity ?? 0)) *
             (item.product.costPrice?.toNumber?.() ?? Number(item.product.costPrice ?? 0)),
@@ -101,7 +101,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         product: item.product,
         warehouse: item.warehouse,
         quantity: item.quantity?.toNumber?.() ?? Number(item.quantity ?? 0),
-        reorderLevel: item.reorderLevel?.toNumber?.() ?? Number(item.reorderLevel ?? 0),
+        minStock: item.product.minStock ?? 0,
         stockValue:
           (item.quantity?.toNumber?.() ?? Number(item.quantity ?? 0)) *
           (item.product.costPrice?.toNumber?.() ?? Number(item.product.costPrice ?? 0)),

@@ -1,12 +1,13 @@
 {
   "buildCommand": "cd packages/frontend && npm install && npm run build",
   "outputDirectory": "packages/frontend/dist",
-  "installCommand": "npm install --ignore-workspaces",
+  "installCommand": "npm install --ignore-workspaces && npx prisma generate",
   "framework": "vite",
   "functions": {
     "api/**/*.ts": {
       "memory": 256,
-      "maxDuration": 30
+      "maxDuration": 30,
+      "includeFiles": "prisma/schema.prisma"
     }
   },
   "rewrites": [

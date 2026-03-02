@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../_lib/prisma';
-import { getUserFromRequest } from '../../_lib/auth';
-import { cors } from '../../_lib/cors';
+import prisma from '../_lib/prisma';
+import { getUserFromRequest } from '../_lib/auth';
+import { cors } from '../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -32,7 +32,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (search) {
           where.OR = [
             { name: { contains: search, mode: 'insensitive' } },
-            { sku: { contains: search, mode: 'insensitive' } },
+            { code: { contains: search, mode: 'insensitive' } },
             { description: { contains: search, mode: 'insensitive' } },
           ];
         }
@@ -70,18 +70,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       case 'POST': {
-        const { name, sku, description, categoryId, costPrice, sellingPrice, unit, isActive } = req.body;
+        const { name, code, description, categoryId, costPrice, sellingPrice, unit, isActive } = req.body;
 
         if (!name) {
           return res.status(400).json({ message: 'Product name is required' });
         }
 
-        if (sku) {
+        if (code) {
           const existing = await prisma.product.findFirst({
-            where: { organizationId: orgId, sku },
+            where: { organizationId: orgId, code },
           });
           if (existing) {
-            return res.status(409).json({ message: 'A product with this SKU already exists' });
+            return res.status(409).json({ message: 'A product with this code already exists' });
           }
         }
 
@@ -89,7 +89,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           data: {
             organizationId: orgId,
             name,
-            sku: sku || null,
+            code: code || null,
             description: description || null,
             categoryId: categoryId || null,
             costPrice: costPrice ?? 0,

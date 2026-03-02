@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../../_lib/prisma';
-import { getUserFromRequest } from '../../../_lib/auth';
-import { cors } from '../../../_lib/cors';
+import prisma from '../../_lib/prisma';
+import { getUserFromRequest } from '../../_lib/auth';
+import { cors } from '../../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -31,8 +31,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               orderBy: { journalEntry: { date: 'desc' } },
               take: 20,
               include: {
-                journalEntry: {
-                  select: { id: true, entryNumber: true, date: true, description: true, status: true },
+                  journalEntry: {
+                  select: { id: true, entryNumber: true, date: true, description: true, isPosted: true },
                 },
               },
             },
@@ -47,7 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const debitSum = await prisma.journalEntryLine.aggregate({
           where: {
             accountId: id,
-            journalEntry: { status: 'POSTED', organizationId: orgId },
+            journalEntry: { isPosted: true },
           },
           _sum: { debit: true },
         });
@@ -55,13 +55,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const creditSum = await prisma.journalEntryLine.aggregate({
           where: {
             accountId: id,
-            journalEntry: { status: 'POSTED', organizationId: orgId },
+            journalEntry: { isPosted: true },
           },
           _sum: { credit: true },
         });
 
-        const totalDebit = debitSum._sum.debit?.toNumber?.() ?? Number(debitSum._sum.debit ?? 0);
-        const totalCredit = creditSum._sum.credit?.toNumber?.() ?? Number(creditSum._sum.credit ?? 0);
+        const totalDebit = debitSum._sum?.debit?.toNumber?.() ?? Number(debitSum._sum?.debit ?? 0);
+        const totalCredit = creditSum._sum?.credit?.toNumber?.() ?? Number(creditSum._sum?.credit ?? 0);
 
         // For ASSET and EXPENSE accounts, balance = debit - credit
         // For LIABILITY, EQUITY, REVENUE accounts, balance = credit - debit
@@ -86,7 +86,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(404).json({ message: 'Account not found' });
         }
 
-        const { code, name, type, parentId, description, isActive } = req.body;
+        const { code, name, type, parentId, isActive } = req.body;
 
         if (code && code !== existing.code) {
           const duplicate = await prisma.account.findFirst({
@@ -108,7 +108,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ...(name !== undefined && { name }),
             ...(type !== undefined && { type }),
             ...(parentId !== undefined && { parentId: parentId || null }),
-            ...(description !== undefined && { description }),
             ...(isActive !== undefined && { isActive }),
           },
         });

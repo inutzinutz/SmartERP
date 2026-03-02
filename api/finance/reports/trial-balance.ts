@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../../_lib/prisma';
-import { getUserFromRequest } from '../../../_lib/auth';
-import { cors } from '../../../_lib/cors';
+import prisma from '../../_lib/prisma';
+import { getUserFromRequest } from '../../_lib/auth';
+import { cors } from '../../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -36,16 +36,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           where: {
             accountId: account.id,
             journalEntry: {
-              organizationId: orgId,
-              status: 'POSTED',
+              isPosted: true,
               date: { lte: asOfDate },
             },
           },
           _sum: { debit: true, credit: true },
         });
 
-        const totalDebit = aggregation._sum.debit?.toNumber?.() ?? Number(aggregation._sum.debit ?? 0);
-        const totalCredit = aggregation._sum.credit?.toNumber?.() ?? Number(aggregation._sum.credit ?? 0);
+        const totalDebit = aggregation._sum?.debit?.toNumber?.() ?? Number(aggregation._sum?.debit ?? 0);
+        const totalCredit = aggregation._sum?.credit?.toNumber?.() ?? Number(aggregation._sum?.credit ?? 0);
 
         return {
           accountId: account.id,

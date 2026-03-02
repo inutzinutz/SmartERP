@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../../_lib/prisma';
-import { getUserFromRequest } from '../../../_lib/auth';
-import { cors } from '../../../_lib/cors';
+import prisma from '../../_lib/prisma';
+import { getUserFromRequest } from '../../_lib/auth';
+import { cors } from '../../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -23,15 +23,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     switch (req.method) {
       case 'GET': {
         const order = await prisma.salesOrder.findFirst({
-          where: { id, organizationId: orgId },
+          where: { id, customer: { organizationId: orgId } },
           include: {
             customer: true,
             items: {
               include: {
-                product: { select: { id: true, name: true, sku: true, unit: true } },
+                product: { select: { id: true, name: true, code: true, unit: true } },
               },
             },
-            createdByUser: { select: { id: true, name: true, email: true } },
+            user: { select: { id: true, firstName: true, lastName: true, email: true } },
           },
         });
 
@@ -44,7 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       case 'PUT': {
         const existing = await prisma.salesOrder.findFirst({
-          where: { id, organizationId: orgId },
+          where: { id, customer: { organizationId: orgId } },
         });
         if (!existing) {
           return res.status(404).json({ message: 'Sales order not found' });
@@ -67,7 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const products = await tx.product.findMany({
               where: { id: { in: productIds }, organizationId: orgId },
             });
-            const productMap = new Map(products.map((p) => [p.id, p]));
+            const productMap = new Map(products.map((p: any) => [p.id, p]));
 
             if (products.length !== productIds.length) {
               throw new Error('One or more products not found');
@@ -78,7 +78,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               const unitPrice = item.unitPrice ?? ((product as any).sellingPrice?.toNumber?.() ?? Number((product as any).sellingPrice ?? 0));
               const quantity = Number(item.quantity);
               const discount = Number(item.discount ?? 0);
-              const totalPrice = quantity * unitPrice - discount;
+              const totalAmount = quantity * unitPrice - discount;
 
               return {
                 salesOrderId: id,
@@ -86,13 +86,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 quantity,
                 unitPrice,
                 discount,
-                totalPrice,
+                totalAmount,
               };
             });
 
             await tx.salesOrderItem.createMany({ data: orderItems });
 
-            const totalAmount = orderItems.reduce((sum: number, item: any) => sum + item.totalPrice, 0);
+            const totalOrderAmount = orderItems.reduce((sum: number, item: any) => sum + item.totalAmount, 0);
 
             return tx.salesOrder.update({
               where: { id },
@@ -100,12 +100,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 ...(customerId && { customerId }),
                 ...(notes !== undefined && { notes }),
                 ...(orderDate && { orderDate: new Date(orderDate) }),
-                totalAmount,
+                totalAmount: totalOrderAmount,
               },
               include: {
                 customer: { select: { id: true, name: true } },
                 items: {
-                  include: { product: { select: { id: true, name: true, sku: true } } },
+                  include: { product: { select: { id: true, name: true, code: true } } },
                 },
               },
             });
@@ -122,7 +122,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             include: {
               customer: { select: { id: true, name: true } },
               items: {
-                include: { product: { select: { id: true, name: true, sku: true } } },
+                include: { product: { select: { id: true, name: true, code: true } } },
               },
             },
           });
@@ -133,7 +133,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       case 'PATCH': {
         const existing = await prisma.salesOrder.findFirst({
-          where: { id, organizationId: orgId },
+          where: { id, customer: { organizationId: orgId } },
           include: { items: true },
         });
         if (!existing) {
@@ -155,7 +155,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               include: {
                 customer: { select: { id: true, name: true } },
                 items: {
-                  include: { product: { select: { id: true, name: true, sku: true } } },
+                  include: { product: { select: { id: true, name: true, code: true } } },
                 },
               },
             });
@@ -163,7 +163,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             // Create receivable
             await tx.receivable.create({
               data: {
-                organizationId: orgId,
                 customerId: existing.customerId,
                 salesOrderId: id,
                 amount: existing.totalAmount,
@@ -189,7 +188,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             include: {
               customer: { select: { id: true, name: true } },
               items: {
-                include: { product: { select: { id: true, name: true, sku: true } } },
+                include: { product: { select: { id: true, name: true, code: true } } },
               },
             },
           });

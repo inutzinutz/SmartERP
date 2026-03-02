@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../../_lib/prisma';
-import { getUserFromRequest } from '../../../_lib/auth';
-import { cors } from '../../../_lib/cors';
+import prisma from '../../_lib/prisma';
+import { getUserFromRequest } from '../../_lib/auth';
+import { cors } from '../../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -23,14 +23,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     switch (req.method) {
       case 'GET': {
         const entry = await prisma.journalEntry.findFirst({
-          where: { id, organizationId: orgId },
+          where: { id, lines: { some: { account: { organizationId: orgId } } } },
           include: {
             lines: {
               include: {
                 account: { select: { id: true, code: true, name: true, type: true } },
               },
             },
-            createdByUser: { select: { id: true, name: true, email: true } },
           },
         });
 
@@ -43,7 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       case 'PATCH': {
         const existing = await prisma.journalEntry.findFirst({
-          where: { id, organizationId: orgId },
+          where: { id, lines: { some: { account: { organizationId: orgId } } } },
           include: { lines: true },
         });
         if (!existing) {
@@ -53,7 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { action } = req.body;
 
         if (action === 'post') {
-          if (existing.status !== 'DRAFT') {
+          if (existing.isPosted) {
             return res.status(400).json({ message: 'Only draft entries can be posted' });
           }
 
@@ -73,7 +72,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           const entry = await prisma.journalEntry.update({
             where: { id },
-            data: { status: 'POSTED', postedAt: new Date() },
+            data: { isPosted: true },
             include: {
               lines: {
                 include: {
@@ -87,7 +86,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         if (action === 'void') {
-          if (existing.status !== 'POSTED') {
+          if (!existing.isPosted) {
             return res.status(400).json({ message: 'Only posted entries can be voided' });
           }
 
@@ -96,12 +95,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             // Void the original entry
             const voided = await tx.journalEntry.update({
               where: { id },
-              data: { status: 'VOIDED' },
+              data: { isPosted: false },
             });
 
             // Generate reversing entry number
             const lastEntry = await tx.journalEntry.findFirst({
-              where: { organizationId: orgId },
+              where: { lines: { some: { account: { organizationId: orgId } } } },
               orderBy: { createdAt: 'desc' },
               select: { entryNumber: true },
             });
@@ -116,15 +115,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             // Create reversing entry with debits and credits swapped
             const reversingEntry = await tx.journalEntry.create({
               data: {
-                organizationId: orgId,
                 entryNumber,
                 date: new Date(),
                 description: `Reversal of ${existing.entryNumber}: ${existing.description || ''}`,
                 reference: `VOID-${existing.entryNumber}`,
-                status: 'POSTED',
-                totalAmount: existing.totalAmount,
-                postedAt: new Date(),
-                createdBy: auth.sub,
+                isPosted: true,
                 lines: {
                   create: existing.lines.map((line: any) => ({
                     accountId: line.accountId,

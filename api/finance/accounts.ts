@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../_lib/prisma';
-import { getUserFromRequest } from '../../_lib/auth';
-import { cors } from '../../_lib/cors';
+import prisma from '../_lib/prisma';
+import { getUserFromRequest } from '../_lib/auth';
+import { cors } from '../_lib/cors';
 
 interface AccountNode {
   id: string;
@@ -10,7 +10,6 @@ interface AccountNode {
   type: string;
   parentId: string | null;
   isActive: boolean;
-  description: string | null;
   children: AccountNode[];
 }
 
@@ -60,7 +59,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const where: any = { organizationId: orgId };
 
-        if (type) where.type = type;
+        if (type) where.type = type as any;
 
         if (search) {
           where.OR = [
@@ -93,7 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // Tree structure
         const accounts = await prisma.account.findMany({
-          where: { organizationId: orgId, ...(type ? { type } : {}) },
+          where: { organizationId: orgId, ...(type ? { type: type as any } : {}) },
           orderBy: { code: 'asc' },
         });
 
@@ -103,7 +102,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       case 'POST': {
-        const { code, name, type, parentId, description, isActive } = req.body;
+        const { code, name, type, parentId, isActive } = req.body;
 
         if (!code || !name || !type) {
           return res.status(400).json({ message: 'code, name, and type are required' });
@@ -139,7 +138,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             name,
             type,
             parentId: parentId || null,
-            description: description || null,
             isActive: isActive !== false,
           },
         });

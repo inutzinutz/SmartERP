@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../_lib/prisma';
-import { getUserFromRequest } from '../../_lib/auth';
-import { cors } from '../../_lib/cors';
+import prisma from '../_lib/prisma';
+import { getUserFromRequest } from '../_lib/auth';
+import { cors } from '../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -23,11 +23,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     switch (req.method) {
       case 'GET': {
         const claim = await prisma.expenseClaim.findFirst({
-          where: { id, organizationId: orgId },
+          where: { id, user: { organizationId: orgId } },
           include: {
-            user: { select: { id: true, name: true, email: true } },
+            user: { select: { id: true, firstName: true, lastName: true, email: true } },
             items: true,
-            approvedByUser: { select: { id: true, name: true, email: true } },
           },
         });
 
@@ -45,7 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       case 'PUT': {
         const existing = await prisma.expenseClaim.findFirst({
-          where: { id, organizationId: orgId },
+          where: { id, user: { organizationId: orgId } },
         });
         if (!existing) {
           return res.status(404).json({ message: 'Expense claim not found' });
@@ -55,8 +54,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(403).json({ message: 'You can only edit your own expense claims' });
         }
 
-        if (existing.status !== 'DRAFT') {
-          return res.status(400).json({ message: 'Only draft claims can be edited' });
+        if (existing.status !== 'PENDING') {
+          return res.status(400).json({ message: 'Only pending claims can be edited' });
         }
 
         const { title, description, items } = req.body;
@@ -89,7 +88,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 totalAmount,
               },
               include: {
-                user: { select: { id: true, name: true, email: true } },
+                user: { select: { id: true, firstName: true, lastName: true, email: true } },
                 items: true,
               },
             });
@@ -102,7 +101,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               ...(description !== undefined && { description }),
             },
             include: {
-              user: { select: { id: true, name: true, email: true } },
+              user: { select: { id: true, firstName: true, lastName: true, email: true } },
               items: true,
             },
           });
@@ -113,7 +112,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       case 'DELETE': {
         const existing = await prisma.expenseClaim.findFirst({
-          where: { id, organizationId: orgId },
+          where: { id, user: { organizationId: orgId } },
         });
         if (!existing) {
           return res.status(404).json({ message: 'Expense claim not found' });
@@ -123,8 +122,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(403).json({ message: 'You can only delete your own expense claims' });
         }
 
-        if (!['DRAFT', 'REJECTED'].includes(existing.status)) {
-          return res.status(400).json({ message: 'Only draft or rejected claims can be deleted' });
+        if (!['PENDING', 'REJECTED'].includes(existing.status)) {
+          return res.status(400).json({ message: 'Only pending or rejected claims can be deleted' });
         }
 
         await prisma.$transaction(async (tx: any) => {
@@ -137,28 +136,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       case 'PATCH': {
         const existing = await prisma.expenseClaim.findFirst({
-          where: { id, organizationId: orgId },
+          where: { id, user: { organizationId: orgId } },
           include: { items: true },
         });
         if (!existing) {
           return res.status(404).json({ message: 'Expense claim not found' });
         }
 
-        const { action, rejectionReason } = req.body;
+        const { action } = req.body;
 
         if (action === 'submit') {
           if (existing.userId !== auth.sub) {
             return res.status(403).json({ message: 'You can only submit your own expense claims' });
           }
-          if (existing.status !== 'DRAFT') {
-            return res.status(400).json({ message: 'Only draft claims can be submitted' });
+          if (existing.status !== 'PENDING') {
+            return res.status(400).json({ message: 'Only pending claims can be submitted' });
           }
 
           const claim = await prisma.expenseClaim.update({
             where: { id },
-            data: { status: 'SUBMITTED', submittedAt: new Date() },
+            data: { status: 'PENDING', submittedAt: new Date() },
             include: {
-              user: { select: { id: true, name: true, email: true } },
+              user: { select: { id: true, firstName: true, lastName: true, email: true } },
               items: true,
             },
           });
@@ -170,8 +169,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           if (!['ADMIN', 'MANAGER'].includes(user.role)) {
             return res.status(403).json({ message: 'Only admins and managers can approve claims' });
           }
-          if (existing.status !== 'SUBMITTED') {
-            return res.status(400).json({ message: 'Only submitted claims can be approved' });
+          if (existing.status !== 'PENDING') {
+            return res.status(400).json({ message: 'Only pending claims can be approved' });
           }
           if (existing.userId === auth.sub) {
             return res.status(400).json({ message: 'You cannot approve your own expense claim' });
@@ -181,13 +180,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             where: { id },
             data: {
               status: 'APPROVED',
-              approvedBy: auth.sub,
               approvedAt: new Date(),
             },
             include: {
-              user: { select: { id: true, name: true, email: true } },
+              user: { select: { id: true, firstName: true, lastName: true, email: true } },
               items: true,
-              approvedByUser: { select: { id: true, name: true, email: true } },
             },
           });
 
@@ -198,20 +195,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           if (!['ADMIN', 'MANAGER'].includes(user.role)) {
             return res.status(403).json({ message: 'Only admins and managers can reject claims' });
           }
-          if (existing.status !== 'SUBMITTED') {
-            return res.status(400).json({ message: 'Only submitted claims can be rejected' });
+          if (existing.status !== 'PENDING') {
+            return res.status(400).json({ message: 'Only pending claims can be rejected' });
           }
 
           const claim = await prisma.expenseClaim.update({
             where: { id },
             data: {
               status: 'REJECTED',
-              rejectionReason: rejectionReason || null,
-              approvedBy: auth.sub,
               approvedAt: new Date(),
             },
             include: {
-              user: { select: { id: true, name: true, email: true } },
+              user: { select: { id: true, firstName: true, lastName: true, email: true } },
               items: true,
             },
           });

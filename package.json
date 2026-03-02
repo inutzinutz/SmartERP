@@ -13,11 +13,11 @@
     "build": "npm run build --workspaces",
     "lint": "npm run lint --workspaces",
     "test": "npm run test --workspaces",
-    "postinstall": "prisma generate --schema=packages/backend/prisma/schema.prisma"
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^5.9.0",
-    "@vercel/node": "^3.0.0",
+    "@vercel/node": "^3.2.29",
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2"
   },

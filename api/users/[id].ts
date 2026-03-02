@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../_lib/prisma';
-import { getUserFromRequest } from '../../_lib/auth';
-import { cors } from '../../_lib/cors';
+import prisma from '../_lib/prisma';
+import { getUserFromRequest } from '../_lib/auth';
+import { cors } from '../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -26,7 +26,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           where: { id, organizationId: orgId },
           select: {
             id: true,
-            name: true,
+            firstName: true,
+            lastName: true,
             email: true,
             role: true,
             isActive: true,
@@ -56,7 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(404).json({ message: 'User not found' });
         }
 
-        const { name, email, role, isActive } = req.body;
+        const { firstName, lastName, email, role, isActive } = req.body;
 
         if (email && email !== existing.email) {
           const duplicate = await prisma.user.findFirst({
@@ -69,7 +70,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // Non-admins cannot change their own role or active status
         const updateData: any = {};
-        if (name !== undefined) updateData.name = name;
+        if (firstName !== undefined) updateData.firstName = firstName;
+        if (lastName !== undefined) updateData.lastName = lastName;
         if (email !== undefined) updateData.email = email;
 
         if (user.role === 'ADMIN') {
@@ -82,7 +84,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           data: updateData,
           select: {
             id: true,
-            name: true,
+            firstName: true,
+            lastName: true,
             email: true,
             role: true,
             isActive: true,
@@ -116,7 +119,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           data: { isActive: false },
           select: {
             id: true,
-            name: true,
+            firstName: true,
+            lastName: true,
             email: true,
             role: true,
             isActive: true,

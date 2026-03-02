@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../_lib/prisma';
-import { getUserFromRequest } from '../../_lib/auth';
-import { cors } from '../../_lib/cors';
+import prisma from '../_lib/prisma';
+import { getUserFromRequest } from '../_lib/auth';
+import { cors } from '../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -28,7 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             category: { select: { id: true, name: true } },
             stockItems: {
               include: {
-                warehouse: { select: { id: true, name: true, location: true } },
+                warehouse: { select: { id: true, name: true, address: true } },
               },
             },
           },
@@ -49,14 +49,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(404).json({ message: 'Product not found' });
         }
 
-        const { name, sku, description, categoryId, costPrice, sellingPrice, unit, isActive } = req.body;
+        const { name, code, description, categoryId, costPrice, sellingPrice, unit, isActive } = req.body;
 
-        if (sku && sku !== existing.sku) {
+        if (code && code !== existing.code) {
           const duplicate = await prisma.product.findFirst({
-            where: { organizationId: orgId, sku, id: { not: id } },
+            where: { organizationId: orgId, code, id: { not: id } },
           });
           if (duplicate) {
-            return res.status(409).json({ message: 'A product with this SKU already exists' });
+            return res.status(409).json({ message: 'A product with this code already exists' });
           }
         }
 
@@ -64,7 +64,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           where: { id },
           data: {
             ...(name !== undefined && { name }),
-            ...(sku !== undefined && { sku }),
+            ...(code !== undefined && { code }),
             ...(description !== undefined && { description }),
             ...(categoryId !== undefined && { categoryId: categoryId || null }),
             ...(costPrice !== undefined && { costPrice }),

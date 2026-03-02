@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from '../../../_lib/prisma';
-import { getUserFromRequest } from '../../../_lib/auth';
-import { cors } from '../../../_lib/cors';
+import prisma from '../../_lib/prisma';
+import { getUserFromRequest } from '../../_lib/auth';
+import { cors } from '../../_lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (cors(req, res)) return;
@@ -48,16 +48,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           where: {
             accountId: account.id,
             journalEntry: {
-              organizationId: orgId,
-              status: 'POSTED',
+              isPosted: true,
               date: { gte: startDate, lte: endDate },
             },
           },
           _sum: { debit: true, credit: true },
         });
 
-        const debit = agg._sum.debit?.toNumber?.() ?? Number(agg._sum.debit ?? 0);
-        const credit = agg._sum.credit?.toNumber?.() ?? Number(agg._sum.credit ?? 0);
+        const debit = agg._sum?.debit?.toNumber?.() ?? Number(agg._sum?.debit ?? 0);
+        const credit = agg._sum?.credit?.toNumber?.() ?? Number(agg._sum?.credit ?? 0);
         // Revenue is credit-normal
         const balance = credit - debit;
 
@@ -77,16 +76,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           where: {
             accountId: account.id,
             journalEntry: {
-              organizationId: orgId,
-              status: 'POSTED',
+              isPosted: true,
               date: { gte: startDate, lte: endDate },
             },
           },
           _sum: { debit: true, credit: true },
         });
 
-        const debit = agg._sum.debit?.toNumber?.() ?? Number(agg._sum.debit ?? 0);
-        const credit = agg._sum.credit?.toNumber?.() ?? Number(agg._sum.credit ?? 0);
+        const debit = agg._sum?.debit?.toNumber?.() ?? Number(agg._sum?.debit ?? 0);
+        const credit = agg._sum?.credit?.toNumber?.() ?? Number(agg._sum?.credit ?? 0);
         // Expense is debit-normal
         const balance = debit - credit;
 
