@@ -107,8 +107,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           if (!stockItem) {
             stockItem = await tx.stockItem.create({
               data: {
-                productId,
-                warehouseId,
+                product: { connect: { id: productId } },
+                warehouse: { connect: { id: warehouseId } },
                 quantity: 0,
               },
             });
@@ -144,8 +144,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           // Create the movement record
           const movement = await tx.stockMovement.create({
             data: {
-              productId,
-              warehouseId,
+              product: { connect: { id: productId } },
+              warehouse: { connect: { id: warehouseId } },
               type,
               quantity: qty,
               reference: reference || null,

@@ -92,8 +92,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return {
             description: item.description,
             amount,
-            category: item.category || null,
-            date: item.date ? new Date(item.date) : new Date(),
+            category: item.category || 'General',
+            expenseDate: item.date ? new Date(item.date) : new Date(),
             receiptUrl: item.receiptUrl || null,
           };
         });
@@ -103,7 +103,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const claim = await prisma.$transaction(async (tx: any) => {
           return tx.expenseClaim.create({
             data: {
-              userId: auth.sub,
+              user: { connect: { id: auth.sub } },
+              claimNumber: `EXP-${Date.now()}`,
               title,
               description: description || null,
               totalAmount,

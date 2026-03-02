@@ -131,12 +131,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const salesOrder = await tx.salesOrder.create({
             data: {
               orderNumber,
-              customerId,
+              customer: { connect: { id: customerId } },
+              user: { connect: { id: auth.sub } },
               status: 'DRAFT',
+              subtotal: totalOrderAmount,
               totalAmount: totalOrderAmount,
               notes: notes || null,
               orderDate: orderDate ? new Date(orderDate) : new Date(),
-              createdBy: auth.sub,
               items: {
                 create: orderItems,
               },

@@ -78,13 +78,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const supplier = await prisma.supplier.create({
           data: {
-            organizationId: orgId,
+            organization: { connect: { id: orgId } },
             name,
             email: email || null,
             phone: phone || null,
             address: address || null,
             taxId: taxId || null,
-            code: code || null,
+            code: code || 'SUP-' + Date.now(),
             contactPerson: contactPerson || null,
           },
         });

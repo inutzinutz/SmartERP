@@ -133,7 +133,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const account = await prisma.account.create({
           data: {
-            organizationId: orgId,
+            organization: { connect: { id: orgId } },
             code,
             name,
             type,

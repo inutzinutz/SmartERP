@@ -101,7 +101,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // In production, password should be hashed. This assumes the auth layer handles it.
         const newUser = await prisma.user.create({
           data: {
-            organizationId: orgId,
+            organization: { connect: { id: orgId } },
             firstName,
             lastName,
             email,

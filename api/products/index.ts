@@ -87,9 +87,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const product = await prisma.product.create({
           data: {
-            organizationId: orgId,
+            organization: { connect: { id: orgId } },
             name,
-            code: code || null,
+            code: code || 'PROD-' + Date.now(),
             description: description || null,
             categoryId: categoryId || null,
             costPrice: costPrice ?? 0,

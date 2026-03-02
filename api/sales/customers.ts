@@ -81,15 +81,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const customer = await prisma.customer.create({
           data: {
-            organizationId: orgId,
+            organization: { connect: { id: orgId } },
             name,
             email: email || null,
             phone: phone || null,
             address: address || null,
             taxId: taxId || null,
-            code: code || null,
+            code: code || 'CUST-' + Date.now(),
             tier: tier || 'STANDARD',
-            creditLimit: creditLimit ?? null,
+            creditLimit: creditLimit ?? 0,
           },
         });
 
