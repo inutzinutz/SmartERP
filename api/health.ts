@@ -1,46 +1,70 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  try {
-    const info: Record<string, any> = {
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      node: process.version,
-      env: {
-        DATABASE_URL: process.env.DATABASE_URL ? 'SET (length: ' + process.env.DATABASE_URL.length + ', host: ' + (process.env.DATABASE_URL.match(/@([^:\/]+)/)?.[1] ?? 'unknown') + ')' : 'NOT SET',
-        DIRECT_URL: process.env.DIRECT_URL ? 'SET' : 'NOT SET',
-        JWT_SECRET: process.env.JWT_SECRET ? 'SET' : 'NOT SET',
-      },
-    };
+  const info: Record<string, any> = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    node: process.version,
+  };
 
-    // Test Prisma connection
+  const regions = [
+    'ap-southeast-1',
+    'us-east-1',
+    'ap-southeast-2',
+    'ap-northeast-1',
+    'eu-west-1',
+    'eu-central-1',
+    'us-west-1',
+    'us-west-2',
+  ];
+
+  const password = process.env.DATABASE_URL?.match(/:([^@]+)@/)?.[1] ?? '';
+  const projectRef = 'hlplnckcqsmcbauuerrr';
+  info.passwordLen = password.length;
+
+  // Test each region
+  const results: Record<string, string> = {};
+  const { PrismaClient } = require('@prisma/client');
+
+  for (const region of regions) {
+    const url = `postgresql://postgres.${projectRef}:${password}@aws-0-${region}.pooler.supabase.com:6543/postgres?pgbouncer=true&connect_timeout=5`;
     try {
-      const { PrismaClient } = require('@prisma/client');
-      info.prismaImport = 'OK';
-
       const prisma = new PrismaClient({
-        datasources: {
-          db: { url: process.env.DATABASE_URL },
-        },
+        datasources: { db: { url } },
       });
-      const result = await prisma.$queryRaw`SELECT 1 as test`;
-      info.dbConnection = 'OK';
-      info.dbResult = result;
+      await prisma.$queryRaw`SELECT 1 as test`;
+      results[region] = 'OK';
       await prisma.$disconnect();
-    } catch (prismaErr: any) {
-      info.prismaError = prismaErr.message?.substring(0, 500);
+      info.workingRegion = region;
+      info.workingUrl = url.replace(password, '***');
+      break;
+    } catch (err: any) {
+      results[region] = err.message?.substring(0, 100) ?? 'Unknown error';
+      try {
+        // Try to disconnect even on error
+      } catch {}
     }
-
-    return res.status(200).json(info);
-  } catch (error: any) {
-    return res.status(500).json({
-      status: 'error',
-      message: error.message,
-    });
   }
+
+  // Also test the direct connection
+  try {
+    const directUrl = `postgresql://postgres:${password}@db.${projectRef}.supabase.co:5432/postgres`;
+    const prisma = new PrismaClient({
+      datasources: { db: { url: directUrl } },
+    });
+    await prisma.$queryRaw`SELECT 1 as test`;
+    results['direct-5432'] = 'OK';
+    info.directWorks = true;
+    await prisma.$disconnect();
+  } catch (err: any) {
+    results['direct-5432'] = err.message?.substring(0, 100) ?? 'Unknown error';
+  }
+
+  info.regionResults = results;
+
+  return res.status(200).json(info);
 }
