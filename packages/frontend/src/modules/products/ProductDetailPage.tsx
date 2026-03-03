@@ -227,7 +227,7 @@ const ProductDetailPage: React.FC = () => {
           <Button
             type="primary"
             icon={<EditOutlined />}
-            onClick={() => navigate(`/products?edit=${product.id}`)}
+            onClick={() => navigate('/products', { state: { editProductId: product.id } })}
           >
             {t('common.edit', 'Edit')}
           </Button>

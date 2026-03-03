@@ -12,6 +12,7 @@ import {
   Col,
   Spin,
   Tag,
+  message,
 } from 'antd';
 import {
   FileTextOutlined,
@@ -109,6 +110,11 @@ const FinancialReportsPage: React.FC = () => {
       setLoading(false);
     }
   }, [dateRange]);
+
+  // Auto-load on mount
+  React.useEffect(() => {
+    fetchReport(activeTab);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleTabChange = (key: string) => {
     setActiveTab(key);
@@ -401,8 +407,41 @@ const FinancialReportsPage: React.FC = () => {
         </Col>
         <Col>
           <Space>
-            <Button icon={<PrinterOutlined />}>{t('reports.print', 'Print')}</Button>
-            <Button icon={<DownloadOutlined />}>{t('reports.export', 'Export')}</Button>
+            <Button icon={<PrinterOutlined />} onClick={() => window.print()}>
+              {t('reports.print', 'Print')}
+            </Button>
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={() => {
+                // Export current report as CSV
+                const reportData = activeTab === 'trialBalance' ? trialBalance
+                  : activeTab === 'incomeStatement' ? incomeStatement
+                  : balanceSheet;
+                if (!reportData.length) {
+                  message.warning(t('reports.noDataToExport', 'No data to export. Generate a report first.'));
+                  return;
+                }
+                const headers = activeTab === 'trialBalance'
+                  ? 'Code,Account Name,Type,Debit,Credit'
+                  : 'Code,Account Name,Category,Amount';
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const rows = reportData.map((row: any) =>
+                  activeTab === 'trialBalance'
+                    ? `"${row.accountCode}","${row.accountName}","${row.accountType}",${row.debit || 0},${row.credit || 0}`
+                    : `"${row.accountCode}","${row.accountName}","${row.category}",${row.amount || 0}`
+                );
+                const csv = [headers, ...rows].join('\n');
+                const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `${activeTab}_${dateRange[0].format('YYYY-MM-DD')}_${dateRange[1].format('YYYY-MM-DD')}.csv`;
+                link.click();
+                URL.revokeObjectURL(link.href);
+                message.success(t('reports.exportSuccess', 'Report exported successfully'));
+              }}
+            >
+              {t('reports.export', 'Export CSV')}
+            </Button>
           </Space>
         </Col>
       </Row>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useDebounce } from '@/hooks/useDebounce';
 import {
   Table,
   Button,
@@ -25,7 +26,7 @@ import {
   EyeOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { api, formatCurrency } from '@/utils/api';
 
 const { Title } = Typography;
@@ -65,6 +66,7 @@ interface PaginatedResponse {
 const ProductsPage: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
@@ -75,12 +77,13 @@ const ProductsPage: React.FC = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm<ProductFormValues>();
+  const debouncedSearch = useDebounce(search, 400);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await api.get<PaginatedResponse>('/products', {
-        params: { page, limit: pageSize, search: search || undefined },
+        params: { page, limit: pageSize, search: debouncedSearch || undefined },
       });
       setProducts(data.data);
       setTotal(data.total);
@@ -89,11 +92,24 @@ const ProductsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, search]);
+  }, [page, pageSize, debouncedSearch]);
 
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
+
+  // Auto-open edit modal when navigated from ProductDetailPage
+  useEffect(() => {
+    const editId = (location.state as { editProductId?: string })?.editProductId;
+    if (editId && products.length > 0) {
+      const product = products.find((p) => p.id === editId);
+      if (product) {
+        handleOpenEdit(product);
+        // Clear the state so it doesn't re-trigger
+        window.history.replaceState({}, document.title);
+      }
+    }
+  }, [products, location.state]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleOpenCreate = () => {
     setEditingProduct(null);

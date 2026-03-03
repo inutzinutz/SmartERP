@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useDebounce } from '@/hooks/useDebounce';
 import {
   Table,
   Card,
@@ -77,12 +78,13 @@ const UsersPage: React.FC = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm<UserFormValues>();
+  const debouncedSearch = useDebounce(search, 400);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await api.get('/users', {
-        params: { page, limit: pageSize, search: search || undefined },
+        params: { page, limit: pageSize, search: debouncedSearch || undefined },
       });
       setUsers(data.data || data);
       setTotal(data.total || 0);
@@ -91,7 +93,7 @@ const UsersPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, search]);
+  }, [page, pageSize, debouncedSearch]);
 
   useEffect(() => {
     fetchUsers();

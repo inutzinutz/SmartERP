@@ -1,8 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
   --sidebar-width: 256px;
@@ -65,4 +65,52 @@ body {
   opacity: 1;
   transform: translateY(0);
   transition: opacity 200ms, transform 200ms;
+}
+
+/* Responsive: hide sidebar on mobile, show as overlay */
+@media (max-width: 768px) {
+  .ant-layout-sider {
+    position: fixed !important;
+    z-index: 200 !important;
+  }
+
+  /* Ensure content takes full width on mobile */
+  .ant-layout {
+    margin-left: 0 !important;
+  }
+
+  /* Print styles */
+  @media print {
+    .ant-layout-sider,
+    .ant-layout-header {
+      display: none !important;
+    }
+    .ant-layout {
+      margin-left: 0 !important;
+    }
+    .ant-layout-content {
+      padding: 0 !important;
+    }
+  }
+}
+
+/* Print styles */
+@media print {
+  .ant-layout-sider,
+  .ant-layout-header,
+  .ant-btn,
+  .ant-tabs-nav {
+    display: none !important;
+  }
+  .ant-layout {
+    margin-left: 0 !important;
+  }
+  .ant-layout-content {
+    padding: 0 !important;
+    min-height: auto !important;
+  }
+  .ant-card {
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+  }
 }

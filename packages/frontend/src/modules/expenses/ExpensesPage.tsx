@@ -126,7 +126,7 @@ const ExpensesPage: React.FC = () => {
     if (!isManager) return;
     setApprovalsLoading(true);
     try {
-      const { data } = await api.get('/expenses?status=PENDING');
+      const { data } = await api.get('/expenses?status=SUBMITTED');
       setPendingApprovals(data.data || data);
     } catch {
       // handled

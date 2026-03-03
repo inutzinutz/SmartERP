@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -11,7 +11,6 @@ import {
   Space,
   Button,
   Typography,
-  Divider,
 } from 'antd';
 import {
   DashboardOutlined,
@@ -35,7 +34,6 @@ import {
   FileTextOutlined,
   AccountBookOutlined,
   AuditOutlined,
-  TransactionOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '@/store/authStore';
 import { useAppStore } from '@/store/appStore';
@@ -46,6 +44,17 @@ const { Text } = Typography;
 
 type MenuItem = Required<MenuProps>['items'][number];
 
+// Compute which submenu group a pathname belongs to
+function getOpenKeysForPath(path: string): string[] {
+  if (path.startsWith('/products') || path.startsWith('/inventory') || path.startsWith('/warehouses')) {
+    return ['inventory-group'];
+  }
+  if (path.startsWith('/sales')) return ['sales-group'];
+  if (path.startsWith('/purchases')) return ['purchases-group'];
+  if (path.startsWith('/finance')) return ['finance-group'];
+  return [];
+}
+
 export default function MainLayout() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -53,66 +62,77 @@ export default function MainLayout() {
   const { user, logout } = useAuthStore();
   const { sidebarCollapsed, toggleSidebar } = useAppStore();
   const [searchVisible, setSearchVisible] = useState(false);
+  const [openKeys, setOpenKeys] = useState<string[]>(getOpenKeysForPath(location.pathname));
+
+  // Auto-expand the correct submenu group when route changes
+  useEffect(() => {
+    const keysForPath = getOpenKeysForPath(location.pathname);
+    setOpenKeys((prev) => {
+      const merged = new Set([...prev, ...keysForPath]);
+      return Array.from(merged);
+    });
+  }, [location.pathname]);
 
   const menuItems: MenuItem[] = [
     {
       key: '/dashboard',
       icon: <DashboardOutlined />,
-      label: t('nav.dashboard'),
+      label: t('nav.dashboard', 'Dashboard'),
     },
     {
       key: 'inventory-group',
       icon: <InboxOutlined />,
-      label: t('nav.inventory'),
+      label: t('nav.inventory', 'Inventory'),
       children: [
-        { key: '/products', icon: <ShoppingOutlined />, label: t('nav.products') },
-        { key: '/inventory', icon: <InboxOutlined />, label: t('nav.stockMovements') },
-        { key: '/warehouses', icon: <ShopOutlined />, label: t('nav.warehouses') },
+        { key: '/products', icon: <ShoppingOutlined />, label: t('nav.products', 'Products') },
+        { key: '/inventory', icon: <InboxOutlined />, label: t('nav.stockMovements', 'Stock & Movements') },
+        { key: '/warehouses', icon: <ShopOutlined />, label: t('nav.warehouses', 'Warehouses') },
       ],
     },
     {
       key: 'sales-group',
       icon: <ShoppingCartOutlined />,
-      label: t('nav.sales'),
+      label: t('nav.sales', 'Sales'),
       children: [
-        { key: '/sales/orders', icon: <FileTextOutlined />, label: t('nav.salesOrders') },
-        { key: '/sales/customers', icon: <TeamOutlined />, label: t('nav.customers') },
+        { key: '/sales/quotations', icon: <FileTextOutlined />, label: t('nav.quotations', 'Quotations') },
+        { key: '/sales/orders', icon: <FileTextOutlined />, label: t('nav.salesOrders', 'Sales Orders') },
+        { key: '/sales/customers', icon: <TeamOutlined />, label: t('nav.customers', 'Customers') },
       ],
     },
     {
       key: 'purchases-group',
       icon: <ShopOutlined />,
-      label: t('nav.purchases'),
+      label: t('nav.purchases', 'Purchases'),
       children: [
-        { key: '/purchases/orders', icon: <FileTextOutlined />, label: t('nav.purchaseOrders') },
-        { key: '/purchases/suppliers', icon: <TeamOutlined />, label: t('nav.suppliers') },
+        { key: '/purchases/orders', icon: <FileTextOutlined />, label: t('nav.purchaseOrders', 'Purchase Orders') },
+        { key: '/purchases/suppliers', icon: <TeamOutlined />, label: t('nav.suppliers', 'Suppliers') },
       ],
     },
     {
       key: 'finance-group',
       icon: <DollarOutlined />,
-      label: t('nav.finance'),
+      label: t('nav.finance', 'Finance'),
       children: [
-        { key: '/finance/accounts', icon: <AccountBookOutlined />, label: t('nav.accounts') },
-        { key: '/finance/journal', icon: <AuditOutlined />, label: t('nav.journalEntries') },
-        { key: '/finance/reports', icon: <BarChartOutlined />, label: t('nav.reports') },
+        { key: '/finance/accounts', icon: <AccountBookOutlined />, label: t('nav.accounts', 'Chart of Accounts') },
+        { key: '/finance/journal', icon: <AuditOutlined />, label: t('nav.journalEntries', 'Journal Entries') },
+        { key: '/finance/reports', icon: <BarChartOutlined />, label: t('nav.reports', 'Reports') },
       ],
     },
     {
       key: '/expenses',
       icon: <WalletOutlined />,
-      label: t('nav.expenses'),
+      label: t('nav.expenses', 'Expenses'),
     },
     { type: 'divider' },
     {
       key: '/users',
       icon: <UserOutlined />,
-      label: t('nav.users'),
+      label: t('nav.users', 'Users'),
     },
     {
       key: '/settings',
       icon: <SettingOutlined />,
-      label: t('nav.settings'),
+      label: t('nav.settings', 'Settings'),
     },
   ];
 
@@ -122,47 +142,49 @@ export default function MainLayout() {
     }
   };
 
-  const getSelectedKeys = () => {
-    const path = location.pathname;
-    return [path];
+  const handleOpenChange = (keys: string[]) => {
+    setOpenKeys(keys);
   };
 
-  const getOpenKeys = () => {
+  const getSelectedKeys = () => {
     const path = location.pathname;
-    if (path.startsWith('/products') || path.startsWith('/inventory') || path.startsWith('/warehouses')) {
-      return ['inventory-group'];
-    }
-    if (path.startsWith('/sales')) return ['sales-group'];
-    if (path.startsWith('/purchases')) return ['purchases-group'];
-    if (path.startsWith('/finance')) return ['finance-group'];
-    return [];
+    // Match exact or prefix for nested routes like /products/:id
+    const allKeys = [
+      '/dashboard', '/products', '/inventory', '/warehouses',
+      '/sales/quotations', '/sales/orders', '/sales/customers',
+      '/purchases/orders', '/purchases/suppliers',
+      '/finance/accounts', '/finance/journal', '/finance/reports',
+      '/expenses', '/users', '/settings',
+    ];
+    const match = allKeys.find((k) => path === k || path.startsWith(k + '/'));
+    return match ? [match] : [path];
   };
 
   const languageMenu: MenuProps['items'] = [
-    { key: 'th', label: '🇹🇭 ไทย' },
-    { key: 'en', label: '🇺🇸 English' },
-    { key: 'zh', label: '🇨🇳 中文' },
+    { key: 'th', label: 'TH Thai' },
+    { key: 'en', label: 'EN English' },
+    { key: 'zh', label: 'ZH Chinese' },
   ];
 
   const userMenu: MenuProps['items'] = [
     {
       key: 'profile',
       icon: <UserOutlined />,
-      label: `${user?.firstName} ${user?.lastName}`,
+      label: `${user?.firstName || ''} ${user?.lastName || ''}`.trim(),
       disabled: true,
     },
     {
       key: 'org',
       icon: <BankOutlined />,
-      label: user?.organization?.name,
+      label: user?.organization?.name || 'Organization',
       disabled: true,
     },
     { type: 'divider' },
-    { key: 'settings', icon: <SettingOutlined />, label: t('nav.settings') },
+    { key: 'settings', icon: <SettingOutlined />, label: t('nav.settings', 'Settings') },
     {
       key: 'logout',
       icon: <LogoutOutlined />,
-      label: t('auth.logout'),
+      label: t('auth.logout', 'Logout'),
       danger: true,
     },
   ];
@@ -236,7 +258,8 @@ export default function MainLayout() {
         <Menu
           mode="inline"
           selectedKeys={getSelectedKeys()}
-          defaultOpenKeys={getOpenKeys()}
+          openKeys={sidebarCollapsed ? [] : openKeys}
+          onOpenChange={handleOpenChange}
           items={menuItems}
           onClick={handleMenuClick}
           style={{
@@ -278,13 +301,12 @@ export default function MainLayout() {
             />
             {searchVisible ? (
               <Input
-                placeholder={t('common.search') + '...'}
+                placeholder={t('common.search', 'Search') + '...'}
                 prefix={<SearchOutlined />}
                 style={{ width: 300 }}
                 autoFocus
                 onBlur={() => setSearchVisible(false)}
-                onPressEnter={(e) => {
-                  console.log('Search:', (e.target as HTMLInputElement).value);
+                onPressEnter={() => {
                   setSearchVisible(false);
                 }}
               />
@@ -311,8 +333,8 @@ export default function MainLayout() {
             </Dropdown>
 
             {/* Notifications */}
-            <Badge count={3} size="small">
-              <Button type="text" icon={<BellNotification />} />
+            <Badge count={0} size="small">
+              <Button type="text" icon={<BellOutlined style={{ fontSize: 16 }} />} />
             </Badge>
 
             {/* User Avatar */}
@@ -350,9 +372,4 @@ export default function MainLayout() {
       </Layout>
     </Layout>
   );
-}
-
-// Bell notification icon component
-function BellNotification() {
-  return <BellOutlined style={{ fontSize: 16 }} />;
 }

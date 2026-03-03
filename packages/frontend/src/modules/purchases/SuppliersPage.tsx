@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useDebounce } from '@/hooks/useDebounce';
 import {
   Table,
   Card,
@@ -72,12 +73,13 @@ const SuppliersPage: React.FC = () => {
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm<SupplierFormValues>();
+  const debouncedSearch = useDebounce(search, 400);
 
   const fetchSuppliers = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await api.get('/purchases/suppliers', {
-        params: { page, limit: pageSize, search: search || undefined },
+        params: { page, limit: pageSize, search: debouncedSearch || undefined },
       });
       setSuppliers(data.data || data);
       setTotal(data.total || 0);
@@ -86,7 +88,7 @@ const SuppliersPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, search]);
+  }, [page, pageSize, debouncedSearch]);
 
   useEffect(() => {
     fetchSuppliers();

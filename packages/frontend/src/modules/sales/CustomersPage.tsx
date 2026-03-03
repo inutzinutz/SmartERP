@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useDebounce } from '@/hooks/useDebounce';
 import {
   Table,
   Card,
@@ -75,12 +76,13 @@ const CustomersPage: React.FC = () => {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm<CustomerFormValues>();
+  const debouncedSearch = useDebounce(search, 400);
 
   const fetchCustomers = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await api.get('/sales/customers', {
-        params: { page, limit: pageSize, search: search || undefined },
+        params: { page, limit: pageSize, search: debouncedSearch || undefined },
       });
       setCustomers(data.data || data);
       setTotal(data.total || 0);
@@ -89,7 +91,7 @@ const CustomersPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, search]);
+  }, [page, pageSize, debouncedSearch]);
 
   useEffect(() => {
     fetchCustomers();
